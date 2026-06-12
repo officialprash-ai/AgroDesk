@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Dealer {
+  id           String   @id @default(cuid())
+  name         String
+  city         String
+  district     String
+  state        String   @default("Maharashtra")
+  gst_number   String?
+  phone        String
+  email        String?
+  language     String   @default("mr")
+  plan          String   @default("growth")
+  password_hash String   @default("")
+  created_at    DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  contacts     Contact[]
+  campaigns    Campaign[]
+  tractors     UsedTractor[]
+  recovery     RecoveryCase[]
+  documents    Document[]
+  accountants  Accountant[]
+  agent_jobs   AgentJob[]
+  @@map("dealers")
+}
+
+model Contact {
+  id                String    @id @default(cuid())
+  dealer_id         String
+  name              String
+  phone             String
+  email             String?
+  village           String?
+  district          String?
+  state             String?
+  language          String    @default("mr")
+  lead_status       String    @default("new")
+  score             Int       @default(0)
+  tags              String[]
+  last_contact      DateTime?
+  opt_in_whatsapp   Boolean   @default(false)
+  opt_in_sms        Boolean   @default(false)
+  opt_in_call       Boolean   @default(false)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  dealer            Dealer    @relation(fields: [dealer_id], references: [id])
+  consents          Consent[]
+  @@map("contacts")
+}
+
+model UsedTractor {
+  id            String   @id @default(cuid())
+  dealer_id     String
+  make          String
+  model         String
+  year          Int
+  hours         Int
+  asking_price  Int
+  cost_price    Int
+  days_on_lot   Int      @default(0)
+  urgency_score Int      @default(0)
+  condition     String   @default("good")
+  description   String?
+  ai_description String?
+  photos        String[]
+  status        String   @default("available")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  dealer        Dealer   @relation(fields: [dealer_id], references: [id])
+  @@map("used_tractors")
+}
+
+model Campaign {
+  id              String   @id @default(cuid())
+  dealer_id       String
+  name            String
+  goal            String
+  channels        String[]
+  status          String   @default("idle")
+  total_contacts  Int      @default(0)
+  sent            Int      @default(0)
+  responses       Int      @default(0)
+  interested      Int      @default(0)
+  language        String   @default("mr")
+  script_voice    String?
+  script_whatsapp String?
+  script_sms      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  dealer          Dealer   @relation(fields: [dealer_id], references: [id])
+  @@map("campaigns")
+}
+
+model RecoveryCase {
+  id                String   @id @default(cuid())
+  dealer_id         String
+  customer_name     String
+  phone             String
+  amount_due        Int
+  due_date          DateTime
+  escalation_stage  String   @default("gentle")
+  last_contact      DateTime?
+  ptp_date          DateTime?
+  ptp_amount        Int?
+  status            String   @default("active")
+  channel_history   Json     @default("[]")
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  dealer            Dealer   @relation(fields: [dealer_id], references: [id])
+  @@map("recovery_cases")
+}
+
+model Document {
+  id            String   @id @default(cuid())
+  dealer_id     String
+  category      String
+  period_month  String
+  file_url      String?
+  filename      String?
+  ocr_data      Json?
+  confirmed     Boolean  @default(false)
+  tally_synced  Boolean  @default(false)
+  uploaded_at   DateTime?
+  created_at    DateTime @default(now())
+
+  dealer        Dealer   @relation(fields: [dealer_id], references: [id])
+  @@map("documents")
+}
+
+model Accountant {
+  id             String  @id @default(cuid())
+  dealer_id      String
+  name           String
+  phone          String
+  email          String
+  tally_enabled  Boolean @default(false)
+  is_default     Boolean @default(false)
+  created_at     DateTime @default(now())
+
+  dealer         Dealer  @relation(fields: [dealer_id], references: [id])
+  @@map("accountants")
+}
+
+model Consent {
+  id          String   @id @default(cuid())
+  dealer_id   String
+  contact_id  String
+  channel     String
+  opt_in_at   DateTime?
+  opt_out_at  DateTime?
+  source      String?
+  created_at  DateTime @default(now())
+
+  contact     Contact  @relation(fields: [contact_id], references: [id])
+  @@map("consents")
+}
+
+model AgentJob {
+  id               String   @id @default(cuid())
+  dealer_id        String
+  agent_type       String
+  payload          Json     @default("{}")
+  status           String   @default("pending")
+  attempts         Int      @default(0)
+  scheduled_for    DateTime @default(now())
+  completed_at     DateTime?
+  error            String?
+  idempotency_key  String   @unique
+  created_at       DateTime @default(now())
+
+  dealer           Dealer   @relation(fields: [dealer_id], references: [id])
+  @@index([dealer_id, agent_type, status])
+  @@map("agent_jobs")
+}
