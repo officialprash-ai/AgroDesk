@@ -28,9 +28,9 @@ export const Button: React.FC<ButtonProps> = ({ variant = 'primary', size = 'md'
 };
 
 // CARD
-interface CardProps { children: React.ReactNode; className?: string; hover?: boolean; accent?: string; }
-export const Card: React.FC<CardProps> = ({ children, className, hover, accent }) => (
-  <div className={cn('glass rounded-2xl p-5 relative overflow-hidden transition-all duration-200', hover && 'glass-hover cursor-pointer', accent && `border-l-[3px]`, className)} style={accent ? { borderLeftColor: accent } : {}}>
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> { children: React.ReactNode; className?: string; hover?: boolean; accent?: string; }
+export const Card: React.FC<CardProps> = ({ children, className, hover, accent, style, ...props }) => (
+  <div className={cn('glass rounded-2xl p-5 relative overflow-hidden transition-all duration-200', hover && 'glass-hover cursor-pointer', accent && `border-l-[3px]`, className)} style={{ ...(accent ? { borderLeftColor: accent } : {}), ...style }} {...props}>
     {children}
   </div>
 );

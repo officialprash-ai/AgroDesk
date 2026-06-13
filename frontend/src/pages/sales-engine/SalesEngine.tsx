@@ -4,8 +4,8 @@ import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, Progress
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
-import { formatRelative, LANGUAGES } from '../../lib/utils';
-import { Megaphone, Plus, Play, Pause, StopCircle, Sparkles, Phone, MessageSquare, Mail, Users, BarChart2, Target, Zap } from 'lucide-react';
+import { LANGUAGES } from '../../lib/utils';
+import { Megaphone, Plus, Play, Pause, Sparkles, Phone, MessageSquare, Mail, Users, BarChart2, Target, Zap } from 'lucide-react';
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   voice: <Phone size={12} />, whatsapp: <MessageSquare size={12} />,
@@ -99,7 +99,7 @@ export const SalesEngine: React.FC = () => {
 
                 {/* Channels */}
                 <div className="flex gap-2">
-                  {c.channels.map(ch => (
+                  {c.channels.map((ch: string) => (
                     <span key={ch} className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg"
                       style={{ background: `${CHANNEL_COLORS[ch]}15`, color: CHANNEL_COLORS[ch], border: `1px solid ${CHANNEL_COLORS[ch]}30` }}>
                       {CHANNEL_ICONS[ch]}{ch}

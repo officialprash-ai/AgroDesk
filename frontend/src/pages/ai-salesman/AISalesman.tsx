@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
-import { Bot, MessageSquare, Phone, CheckCircle, Clock, ArrowRight, Sparkles, Settings, Zap, Users, Send } from 'lucide-react';
+import { Bot, MessageSquare, CheckCircle, Clock, ArrowRight, Sparkles, Zap, Users, Send } from 'lucide-react';
 import { api } from '../../lib/api';
 
 const MOCK_CONVERSATIONS = [
@@ -23,8 +23,7 @@ export const AISalesman: React.FC = () => {
   const [tab, setTab] = useState('conversations');
   const [selectedConv, setSelectedConv] = useState(MOCK_CONVERSATIONS[0]);
   const [inputMsg, setInputMsg] = useState('');
-  const { openScriptModal, dealer } = useAppStore();
-  const dealerId = dealer?.id ?? 'd1';
+  const { openScriptModal } = useAppStore();
   const [chatMessages, setChatMessages] = useState(MOCK_CHAT);
   const [aiTyping, setAiTyping] = useState(false);
 

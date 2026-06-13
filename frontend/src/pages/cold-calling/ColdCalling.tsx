@@ -3,7 +3,7 @@ import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, ProgressBar, Modal, Select } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
-import { formatRelative, LANGUAGES } from '../../lib/utils';
+import { LANGUAGES } from '../../lib/utils';
 import { Phone, Upload, Play, Pause, Users, CheckCircle, XCircle, Clock, Sparkles, Download, AlertCircle } from 'lucide-react';
 
 const MOCK_CALLS = [
@@ -29,7 +29,6 @@ export const ColdCalling: React.FC = () => {
   const [running, setRunning] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadLang, setUploadLang] = useState('mr');
-  const [showFilters, setShowFilters] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const { dealer } = useAppStore();

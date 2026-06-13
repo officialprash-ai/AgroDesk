@@ -5,7 +5,7 @@ import { useAppStore } from '../../store';
 import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
-  Tractor, Zap, BarChart2, MessageSquare, LogOut
+  Tractor, Zap, BarChart2, LogOut
 } from 'lucide-react';
 
 const NAV = [

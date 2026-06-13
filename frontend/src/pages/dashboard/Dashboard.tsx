@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { Header } from '../../components/layout/Header';
-import { MetricCard, Card, Badge, Button, Avatar, ProgressBar } from '../../components/ui';
+import { MetricCard, Card, Badge, Avatar, ProgressBar } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';

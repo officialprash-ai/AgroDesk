@@ -6,7 +6,7 @@ import { cn, LANGUAGES } from '../../lib/utils';
 export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => {
   const { notifications, removeNotification, dealer } = useAppStore();
   const [showNotifs, setShowNotifs] = useState(false);
-  const [lang, setLang] = useState(dealer?.language ?? 'mr');
+  const [lang] = useState(dealer?.language ?? 'mr');
   const initials = dealer?.name
     ? dealer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : 'AD';

@@ -4,7 +4,7 @@ import { Card, Button, Badge, Avatar, SearchInput, TabBar, Modal, Input, Select 
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
-import { formatRelative, getLeadStatusColor, LANGUAGES } from '../../lib/utils';
+import { formatRelative, LANGUAGES } from '../../lib/utils';
 import { UserPlus, Phone, MessageSquare, Sparkles, Filter, Download, ChevronUp, ChevronDown } from 'lucide-react';
 
 const STAGE_TABS = [
@@ -55,7 +55,7 @@ export const Contacts: React.FC = () => {
     setAddLoading(false);
   };
 
-  const { data, loading, refetch } = useApi(() => api.contacts.list(dealerId, { limit: 200 }), [dealerId]);
+  const { data, refetch } = useApi(() => api.contacts.list(dealerId, { limit: 200 }), [dealerId]);
   const contacts = data?.contacts ?? [];
 
   const tabs = STAGE_TABS.map(t => ({ ...t, count: t.id === 'all' ? contacts.length : contacts.filter(c => c.lead_status === t.id).length }));

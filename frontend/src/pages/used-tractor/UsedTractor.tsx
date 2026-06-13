@@ -5,7 +5,7 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatCurrency, TRACTOR_MAKES } from '../../lib/utils';
-import { Truck, Plus, Sparkles, Phone, MessageSquare, Camera, ArrowUpDown, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Truck, Plus, Sparkles, Phone, Camera, ArrowUpDown, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 
 function getUrgencyLabel(score: number) {
   if (score >= 85) return { label: 'Critical', color: '#ef4444' };

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Header } from '../../components/layout/Header';
-import { Card, Badge, Button, Avatar } from '../../components/ui';
+import { Avatar } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatRelative } from '../../lib/utils';
@@ -60,7 +60,7 @@ export const Pipeline: React.FC = () => {
 
                       {c.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
-                          {c.tags.slice(0, 2).map(t => (
+                          {c.tags.slice(0, 2).map((t: string) => (
                             <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] text-[var(--text-muted)]">{t}</span>
                           ))}
                         </div>

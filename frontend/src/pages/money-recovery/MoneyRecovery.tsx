@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Header } from '../../components/layout/Header';
-import { Card, Button, Badge, MetricCard, Modal, Input, TabBar } from '../../components/ui';
+import { Card, Button, MetricCard, Modal, Input, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';

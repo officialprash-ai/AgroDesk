@@ -4,7 +4,7 @@ import { Card, Button, Input, Select, TabBar, Badge } from '../../components/ui'
 import { useAppStore } from '../../store';
 import { authApi } from '../../lib/api';
 import { LANGUAGES } from '../../lib/utils';
-import { Building, Globe, Zap, Shield, Bell, Phone, MessageSquare, Database, CheckCircle } from 'lucide-react';
+import { Building, Zap, Phone, MessageSquare, Database, CheckCircle } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { dealer, setAuth, token } = useAppStore();

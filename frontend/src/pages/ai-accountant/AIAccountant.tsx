@@ -5,7 +5,7 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { BILL_CATEGORIES } from '../../lib/utils';
-import { FileText, Upload, Send, CheckCircle, Clock, AlertCircle, Plus, Phone, Mail, Building, ChevronRight, Camera } from 'lucide-react';
+import { FileText, Upload, Send, CheckCircle, Clock, Plus, Phone, Mail, Building, ChevronRight, Camera } from 'lucide-react';
 
 const MONTH_STEPS = [
   { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: '🚜' },
