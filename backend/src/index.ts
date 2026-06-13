@@ -258,4 +258,13 @@ process.on('SIGINT', async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
-process.on
+
+process.on('SIGTERM', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+// ─── START SERVER ────────────────────────────────────────────
+app.listen(Number(PORT), () => {
+  console.log(`🚜 AgroDesk API listening on port ${PORT}`);
+});

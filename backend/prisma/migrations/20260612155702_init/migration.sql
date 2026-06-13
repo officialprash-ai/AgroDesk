@@ -10,6 +10,7 @@ CREATE TABLE "dealers" (
     "email" TEXT,
     "language" TEXT NOT NULL DEFAULT 'mr',
     "plan" TEXT NOT NULL DEFAULT 'growth',
+    "password_hash" TEXT NOT NULL DEFAULT '',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
