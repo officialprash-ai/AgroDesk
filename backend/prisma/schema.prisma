@@ -183,4 +183,6 @@ model AgentJob {
   created_at       DateTime @default(now())
 
   dealer           Dealer   @relation(fields: [dealer_id], references: [id])
-  @@index([dealer_id, agent_type,
+  @@index([dealer_id, agent_type, status])
+  @@map("agent_jobs")
+}
