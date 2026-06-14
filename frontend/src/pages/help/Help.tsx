@@ -3,7 +3,7 @@ import { Header } from '../../components/layout/Header';
 import { Card } from '../../components/ui';
 import {
   ChevronDown, ChevronUp, HelpCircle, BookOpen, Phone, PlayCircle,
-  Megaphone, Truck, IndianRupee, Bot, FileText, Users, Zap,
+  Megaphone, Truck, IndianRupee, Bot, FileText,
   MessageCircle, Mail, ExternalLink, Rocket, Lightbulb, Search,
   CheckCircle, Star
 } from 'lucide-react';
