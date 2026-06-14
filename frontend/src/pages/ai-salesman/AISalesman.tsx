@@ -3,7 +3,7 @@ import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
 import type { KBEntry } from '../../store';
-import { Bot, MessageSquare, CheckCircle, Clock, Wand2, Zap, Users, Send, Phone, Globe, BookOpen, Tag, Calculator, HelpCircle, Wrench, Sprout, Search, Plus, Trash2, Pencil, X, FileUp, Save, ChevronRight } from 'lucide-react';
+import { Bot, MessageSquare, CheckCircle, Clock, Zap, Users, Send, Phone, Globe, BookOpen, Tag, Calculator, HelpCircle, Wrench, Sprout, Search, Plus, Trash2, Pencil, X, FileUp, Save, ChevronRight } from 'lucide-react';
 import { api } from '../../lib/api';
 import { MorphPanel } from '../../components/ui/MorphPanel';
 
@@ -53,7 +53,7 @@ export const AISalesman: React.FC = () => {
   const [tab, setTab] = useState('conversations');
   const [selectedConv, setSelectedConv] = useState(MOCK_CONVERSATIONS[0]);
   const [inputMsg, setInputMsg] = useState('');
-  const { openScriptModal, knowledgeBase, addKBEntry, updateKBEntry, deleteKBEntry } = useAppStore();
+  const { knowledgeBase, addKBEntry, updateKBEntry, deleteKBEntry } = useAppStore();
   const [chatMessages, setChatMessages] = useState(MOCK_CHAT);
   const [aiTyping, setAiTyping] = useState(false);
 

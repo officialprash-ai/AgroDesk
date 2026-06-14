@@ -64,7 +64,7 @@ interface Ctx {
   triggerClose: () => void;
 }
 const Ctx = React.createContext({} as Ctx);
-const useCtx = () => React.useContext(Ctx);
+export const useCtx = () => React.useContext(Ctx);
 
 // ── MorphPanel ───────────────────────────────────────────────────────────────
 
