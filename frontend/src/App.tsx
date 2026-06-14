@@ -14,6 +14,7 @@ import { ColdCalling } from './pages/cold-calling/ColdCalling';
 import { AISalesman } from './pages/ai-salesman/AISalesman';
 import { AIAccountant } from './pages/ai-accountant/AIAccountant';
 import { Settings } from './pages/settings/Settings';
+import { Help } from './pages/help/Help';
 import { Header } from './components/layout/Header';
 import { Card, MetricCard } from './components/ui';
 import { TrendingUp, Users, Megaphone, IndianRupee } from 'lucide-react';
@@ -46,7 +47,7 @@ const Analytics: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'rgba(240,253,244,0.4)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'rgba(240,253,244,0.4)' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: '#061a0c', border: '1px solid rgba(74,222,128,0.15)', borderRadius: 10, fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: 'var(--tooltip-bg)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
               <Bar dataKey="calls" name="Voice Calls" fill="#60a5fa" radius={[4,4,0,0]} />
               <Bar dataKey="whatsapp" name="WhatsApp" fill="#4ade80" radius={[4,4,0,0]} />
               <Bar dataKey="sms" name="SMS" fill="#fbbf24" radius={[4,4,0,0]} />
@@ -65,7 +66,7 @@ const Analytics: React.FC = () => {
               </defs>
               <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'rgba(240,253,244,0.4)' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'rgba(240,253,244,0.4)' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: '#061a0c', border: '1px solid rgba(74,222,128,0.15)', borderRadius: 10, fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: 'var(--tooltip-bg)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }} />
               <Area type="monotone" dataKey="leads" name="Leads" stroke="#4ade80" strokeWidth={2} fill="url(#leadGrad)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -97,7 +98,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 function App() {
-  const { token } = useAppStore();
+  const { token, theme } = useAppStore();
+
+  // Sync theme attribute to <html> so CSS variables apply globally
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme ?? 'dark');
+  }, [theme]);
 
   if (!token) return <Login />;
 
@@ -116,6 +122,7 @@ function App() {
           <Route path="/ai-salesman" element={<AISalesman />} />
           <Route path="/ai-accountant" element={<AIAccountant />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/help" element={<Help />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppLayout>

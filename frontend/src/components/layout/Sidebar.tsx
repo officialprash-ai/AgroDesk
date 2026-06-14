@@ -5,7 +5,7 @@ import { useAppStore } from '../../store';
 import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
-  Tractor, Zap, BarChart2, LogOut
+  Tractor, Zap, BarChart2, LogOut, HelpCircle
 } from 'lucide-react';
 
 const NAV = [
@@ -24,6 +24,7 @@ const NAV = [
   { to: '/ai-accountant', icon: FileText, label: 'AI Accountant', badge: 'F' },
   { section: 'SYSTEM' },
   { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/help', icon: HelpCircle, label: 'Help & Support' },
 ];
 
 export const Sidebar: React.FC = () => {
