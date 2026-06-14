@@ -27,7 +27,7 @@ const NAV = [
 ];
 
 export const Sidebar: React.FC = () => {
-  const { sidebarOpen, toggleSidebar, dealer, clearAuth } = useAppStore();
+  const { sidebarOpen, toggleSidebar, dealer, clearAuth, dealerLogo } = useAppStore();
   const location = useLocation();
 
   return (
@@ -55,9 +55,18 @@ export const Sidebar: React.FC = () => {
 
       {/* Dealer info */}
       {sidebarOpen && dealer && (
-        <div className="mx-3 mt-3 mb-1 px-3 py-2.5 rounded-xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)]">
-          <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{dealer.name}</p>
-          <p className="text-[10px] text-[var(--text-muted)]">{[dealer.city, dealer.district].filter(Boolean).join(', ')}</p>
+        <div className="mx-3 mt-3 mb-1 px-3 py-2.5 rounded-xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)] flex items-center gap-2.5">
+          {dealerLogo ? (
+            <img src={dealerLogo} alt="logo" className="w-8 h-8 rounded-lg object-contain bg-white/5 flex-shrink-0 p-0.5" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-brand-400/10 border border-brand-400/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-brand-400">
+              {dealer.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{dealer.name}</p>
+            <p className="text-[10px] text-[var(--text-muted)]">{[dealer.city, dealer.district].filter(Boolean).join(', ')}</p>
+          </div>
         </div>
       )}
 

@@ -57,6 +57,10 @@ interface AppStore {
   openScriptModal: (type: string, context?: Record<string, unknown>) => void;
   closeScriptModal: () => void;
 
+  // Dealership logo
+  dealerLogo: string | null;
+  setDealerLogo: (logo: string | null) => void;
+
   // Notifications
   notifications: { id: string; title: string; message: string; type: 'success' | 'error' | 'info'; }[];
   toasts: { id: string; title: string; message: string; type: 'success' | 'error' | 'info'; }[];
@@ -92,6 +96,8 @@ export const useAppStore = create<AppStore>()(
       scriptModal: { open: false, type: '' },
       openScriptModal: (type, context) => set({ scriptModal: { open: true, type, context } }),
       closeScriptModal: () => set({ scriptModal: { open: false, type: '' } }),
+      dealerLogo: null,
+      setDealerLogo: (logo) => set({ dealerLogo: logo }),
       notifications: [],
       toasts: [],
       addNotification: (n) => {
@@ -108,7 +114,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'agrodesk-auth',
-      partialize: (s) => ({ token: s.token, dealer: s.dealer }),
+      partialize: (s) => ({ token: s.token, dealer: s.dealer, dealerLogo: s.dealerLogo }),
     }
   )
 );

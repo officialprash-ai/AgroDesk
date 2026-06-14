@@ -1,16 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Input, Select, TabBar, Badge } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { authApi } from '../../lib/api';
 import { LANGUAGES } from '../../lib/utils';
-import { Building, Zap, Phone, MessageSquare, Database, CheckCircle } from 'lucide-react';
+import { Building, Zap, Phone, MessageSquare, Database, CheckCircle, Upload, X, Image } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const { dealer, setAuth, token } = useAppStore();
+  const { dealer, setAuth, token, dealerLogo, setDealerLogo } = useAppStore();
   const [tab, setTab] = useState('profile');
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError('');
+    if (!file.type.startsWith('image/')) {
+      setLogoError('Please upload an image file (JPG, PNG, SVG, WebP)');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLogoError('Image must be under 2 MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setDealerLogo(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    // reset so same file can be re-selected
+    e.target.value = '';
+  };
 
   // Profile form — seed from dealer store
   const [form, setForm] = useState({
@@ -54,6 +77,64 @@ export const Settings: React.FC = () => {
         {/* Profile */}
         {tab === 'profile' && (
           <div className="max-w-xl space-y-4">
+
+            {/* Logo Upload */}
+            <Card>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                <Image size={14} className="text-brand-400" />Dealership Logo
+              </h3>
+              <div className="flex items-center gap-5">
+                {/* Preview */}
+                <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-[var(--border)] flex items-center justify-center flex-shrink-0 overflow-hidden bg-[rgba(255,255,255,0.03)] relative group">
+                  {dealerLogo ? (
+                    <>
+                      <img src={dealerLogo} alt="Dealership logo" className="w-full h-full object-contain p-1" />
+                      <button
+                        onClick={() => setDealerLogo(null)}
+                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl"
+                        title="Remove logo"
+                      >
+                        <X size={16} className="text-white" />
+                      </button>
+                    </>
+                  ) : (
+                    <Image size={24} className="text-[var(--text-muted)]" />
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex-1 space-y-2">
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Upload your dealership logo. It will appear in the sidebar and on printed documents.
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)]">JPG, PNG, SVG, WebP · Max 2 MB · Recommended: 200×200px</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      <Upload size={12} className="mr-1.5" />
+                      {dealerLogo ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    {dealerLogo && (
+                      <Button size="sm" variant="secondary" onClick={() => setDealerLogo(null)}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {logoError && <p className="text-xs text-red-400">{logoError}</p>}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+              </div>
+            </Card>
+
             <Card>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><Building size={14} className="text-brand-400" />Dealership Information</h3>
               <div className="space-y-3">
