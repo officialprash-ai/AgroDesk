@@ -116,6 +116,11 @@ export const UsedTractor: React.FC = () => {
         </div>
 
         {/* Tractor Grid */}
+        {loading && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => <div key={`sk-${i}`} className="skeleton h-56 rounded-2xl" />)}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {sorted.map((t: any) => {
             const urgency = getUrgencyLabel(t.urgency_score);

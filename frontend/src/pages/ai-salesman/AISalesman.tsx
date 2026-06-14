@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
-import { Bot, MessageSquare, CheckCircle, Clock, ArrowRight, Sparkles, Zap, Users, Send } from 'lucide-react';
+import { Bot, MessageSquare, CheckCircle, Clock, ArrowRight, Sparkles, Zap, Users, Send, Phone, Globe, BookOpen, Tag, Calculator, HelpCircle, Wrench, Sprout } from 'lucide-react';
 import { api } from '../../lib/api';
 
 const MOCK_CONVERSATIONS = [
@@ -45,7 +45,7 @@ export const AISalesman: React.FC = () => {
     setAiTyping(false);
   };
 
-  const channelIcon = (ch: string) => ch === 'whatsapp' ? '💬' : ch === 'phone' ? '📞' : '🌐';
+  const channelIcon = (ch: string) => ch === 'whatsapp' ? <MessageSquare size={16} /> : ch === 'phone' ? <Phone size={16} /> : <Globe size={16} />;
 
   return (
     <div className="flex-1 overflow-auto">
@@ -76,7 +76,9 @@ export const AISalesman: React.FC = () => {
               <div className="flex-1 overflow-y-auto">
                 {MOCK_CONVERSATIONS.map(conv => (
                   <div key={conv.id} onClick={() => setSelectedConv(conv)}
-                    className={`flex items-start gap-3 p-3 border-b border-[rgba(255,255,255,0.03)] cursor-pointer transition-all ${selectedConv.id === conv.id ? 'bg-[rgba(74,222,128,0.06)]' : 'hover:bg-[rgba(255,255,255,0.03)]'}`}>
+                    role="button" tabIndex={0} aria-pressed={selectedConv.id === conv.id}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedConv(conv); } }}
+                    className={`flex items-start gap-3 p-3 border-b border-[rgba(255,255,255,0.03)] cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50 ${selectedConv.id === conv.id ? 'bg-[rgba(74,222,128,0.06)]' : 'hover:bg-[rgba(255,255,255,0.03)]'}`}>
                     <div className="w-9 h-9 rounded-full bg-[rgba(74,222,128,0.1)] flex items-center justify-center text-sm font-bold text-brand-400 flex-shrink-0">
                       {channelIcon(conv.channel)}
                     </div>
@@ -165,15 +167,15 @@ export const AISalesman: React.FC = () => {
         {tab === 'knowledge' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {[
-              { title: 'Tractor Catalog', items: 24, lastUpdated: '2 days ago', icon: '📋' },
-              { title: 'Pricing & Offers', items: 12, lastUpdated: '1 day ago', icon: '💰' },
-              { title: 'EMI Calculator', items: 8, lastUpdated: '5 days ago', icon: '🧮' },
-              { title: 'FAQs', items: 45, lastUpdated: '1 week ago', icon: '❓' },
-              { title: 'Warranty & Service', items: 18, lastUpdated: '3 days ago', icon: '🔧' },
-              { title: 'Govt Schemes (PM-KISAN)', items: 6, lastUpdated: 'Today', icon: '🌾' },
+              { title: 'Tractor Catalog', items: 24, lastUpdated: '2 days ago', icon: BookOpen },
+              { title: 'Pricing & Offers', items: 12, lastUpdated: '1 day ago', icon: Tag },
+              { title: 'EMI Calculator', items: 8, lastUpdated: '5 days ago', icon: Calculator },
+              { title: 'FAQs', items: 45, lastUpdated: '1 week ago', icon: HelpCircle },
+              { title: 'Warranty & Service', items: 18, lastUpdated: '3 days ago', icon: Wrench },
+              { title: 'Govt Schemes (PM-KISAN)', items: 6, lastUpdated: 'Today', icon: Sprout },
             ].map(k => (
               <Card key={k.title} hover className="flex items-center gap-4">
-                <div className="text-2xl">{k.icon}</div>
+                <k.icon size={22} className="text-brand-400 flex-shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[var(--text-primary)]">{k.title}</p>
                   <p className="text-xs text-[var(--text-muted)]">{k.items} items · Updated {k.lastUpdated}</p>

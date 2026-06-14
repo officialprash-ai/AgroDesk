@@ -34,6 +34,8 @@ export const authApi = {
     req<{ token: string; dealer: any }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ phone, password }) }),
   register: (data: { name: string; phone: string; password: string; city?: string; district?: string }) =>
     req<{ token: string; dealer: any }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  googleLogin: (credential: string) =>
+    req<{ token: string; dealer: any }>('/api/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
   me: () => req<{ dealer: any }>('/api/auth/me'),
   updateProfile: (data: Record<string, unknown>) => req<{ dealer: any; success: boolean }>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(data) }),
 };

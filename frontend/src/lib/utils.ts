@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Tractor, FileText, Cog, Wrench, Banknote, Folder } from 'lucide-react';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,12 +39,12 @@ export const LANGUAGES = [
 ];
 
 export const BILL_CATEGORIES = [
-  { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: '🚜', color: '#4ade80' },
-  { key: 'tractor_sales', label: 'Tractor Sales Bills', icon: '📋', color: '#60a5fa' },
-  { key: 'spare_purchase', label: 'Spare Parts Purchase', icon: '⚙️', color: '#fbbf24' },
-  { key: 'spare_sales', label: 'Spare Parts Sales', icon: '🔧', color: '#a78bfa' },
-  { key: 'cash_voucher', label: 'Cash Vouchers', icon: '💵', color: '#f87171' },
-  { key: 'other', label: 'Other Bills', icon: '📁', color: '#6b7280' },
+  { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: Tractor, color: '#4ade80' },
+  { key: 'tractor_sales', label: 'Tractor Sales Bills', icon: FileText, color: '#60a5fa' },
+  { key: 'spare_purchase', label: 'Spare Parts Purchase', icon: Cog, color: '#fbbf24' },
+  { key: 'spare_sales', label: 'Spare Parts Sales', icon: Wrench, color: '#a78bfa' },
+  { key: 'cash_voucher', label: 'Cash Vouchers', icon: Banknote, color: '#f87171' },
+  { key: 'other', label: 'Other Bills', icon: Folder, color: '#6b7280' },
 ];
 
 export const TRACTOR_MAKES = ['Mahindra', 'John Deere', 'TAFE', 'Sonalika', 'Kubota', 'Eicher', 'New Holland', 'VST', 'Force', 'Captain', 'Farmtrac'];

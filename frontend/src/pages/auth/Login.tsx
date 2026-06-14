@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Tractor } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../lib/api';
 import { useAppStore } from '../../store';
 
@@ -32,6 +34,18 @@ export const Login: React.FC = () => {
     setLoading(false);
   };
 
+  const handleDemo = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await authApi.login('+919999999999', 'demo1234');
+      setAuth(res.token, res.dealer);
+    } catch (err: any) {
+      setError(err.message || 'Demo login failed');
+    }
+    setLoading(false);
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -44,6 +58,19 @@ export const Login: React.FC = () => {
       setAuth(res.token, res.dealer);
     } catch (err: any) {
       setError(err.message || 'Registration failed');
+    }
+    setLoading(false);
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    setError('');
+    setLoading(true);
+    try {
+      const res = await authApi.googleLogin(credentialResponse.credential);
+      setAuth(res.token, res.dealer);
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
     }
     setLoading(false);
   };
@@ -94,8 +121,33 @@ export const Login: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-400 text-surface-900 font-semibold text-sm hover:bg-brand-300 transition-colors disabled:opacity-50">
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-[var(--border)]" />
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">or</span>
+                <div className="flex-1 h-px bg-[var(--border)]" />
+              </div>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google sign-in failed')}
+                  theme="filled_black"
+                  shape="rectangular"
+                  size="large"
+                  width="100%"
+                  text="signin_with"
+                />
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-[var(--border)]" />
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">or</span>
+                <div className="flex-1 h-px bg-[var(--border)]" />
+              </div>
+              <button type="button" onClick={handleDemo} disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-amber-400/40 bg-amber-400/10 text-amber-300 font-semibold text-sm hover:bg-amber-400/20 transition-colors disabled:opacity-50">
+                <Tractor size={16} />{loading ? 'Loading demo...' : 'Try the Live Demo'}
+              </button>
               <p className="text-center text-xs text-[var(--text-muted)]">
-                Demo: phone <span className="text-brand-400 font-mono">any</span> · password <span className="text-brand-400 font-mono">any</span> (seed dealer has no password)
+                Read-only-safe demo account. Browse and click freely — outbound calls &amp; messages are simulated, and data resets each login.
               </p>
             </form>
           ) : (
@@ -134,6 +186,22 @@ export const Login: React.FC = () => {
                 className="w-full py-3 rounded-xl bg-brand-400 text-surface-900 font-semibold text-sm hover:bg-brand-300 transition-colors disabled:opacity-50">
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 h-px bg-[var(--border)]" />
+                <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">or sign up with</span>
+                <div className="flex-1 h-px bg-[var(--border)]" />
+              </div>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google sign-in failed')}
+                  theme="filled_black"
+                  shape="rectangular"
+                  size="large"
+                  width="100%"
+                  text="signup_with"
+                />
+              </div>
             </form>
           )}
         </div>

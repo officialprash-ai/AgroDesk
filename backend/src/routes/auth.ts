@@ -2,10 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../lib/prisma.js';
+import { resetDemoData } from '../lib/demoSeed.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET ?? 'agrodesk-dev-secret-change-in-prod';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -18,39 +22,37 @@ router.post('/login', async (req, res) => {
     const dealer = await prisma.dealer.findFirst({ where: { phone } });
     if (!dealer) return res.status(401).json({ error: 'Invalid credentials' });
 
-    // Dev shortcut: if password_hash is empty, accept any password (seed data)
     const valid = dealer.password_hash === ''
       ? true
       : await bcrypt.compare(password, dealer.password_hash);
 
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
+    if (dealer.is_demo) {
+      try { await resetDemoData(prisma); } catch (e) { console.error('Demo reset failed:', e); }
+    }
+
     const token = jwt.sign(
-      { dealer_id: dealer.id, phone: dealer.phone },
+      { dealer_id: dealer.id, phone: dealer.phone, is_demo: dealer.is_demo },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.json({
+    return res.json({
       token,
       dealer: {
-        id: dealer.id,
-        name: dealer.name,
-        city: dealer.city,
-        district: dealer.district,
-        phone: dealer.phone,
-        email: dealer.email,
-        language: dealer.language,
-        plan: dealer.plan,
+        id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
+        phone: dealer.phone, email: dealer.email, language: dealer.language,
+        plan: dealer.plan, is_demo: dealer.is_demo,
       },
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-    res.status(500).json({ error: 'Login failed' });
+    return res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// POST /api/auth/register (for onboarding new dealers)
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
     const { name, phone, password, city, district } = z.object({
@@ -75,17 +77,73 @@ router.post('/register', async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       token,
       dealer: { id: dealer.id, name: dealer.name, city: dealer.city, phone: dealer.phone, plan: dealer.plan },
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-    res.status(500).json({ error: 'Registration failed' });
+    return res.status(500).json({ error: 'Registration failed' });
   }
 });
 
-// GET /api/auth/me  (verify token + return dealer)
+// POST /api/auth/google
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = z.object({ credential: z.string().min(1) }).parse(req.body);
+
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ error: 'Google auth not configured' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
+    const gPayload = ticket.getPayload();
+    if (!gPayload?.sub) return res.status(401).json({ error: 'Invalid Google token' });
+
+    const { sub: google_id, email, name: googleName } = gPayload;
+
+    let dealer = await prisma.dealer.findFirst({
+      where: { OR: [{ google_id }, ...(email ? [{ email }] : [])] },
+    });
+
+    if (!dealer) {
+      dealer = await prisma.dealer.create({
+        data: {
+          google_id,
+          email: email ?? null,
+          name: googleName ?? email ?? 'New Dealer',
+          phone: 'google-' + google_id,
+          city: '',
+          district: '',
+          password_hash: '',
+        },
+      });
+    } else if (!dealer.google_id) {
+      dealer = await prisma.dealer.update({ where: { id: dealer.id }, data: { google_id } });
+    }
+
+    const token = jwt.sign(
+      { dealer_id: dealer.id, phone: dealer.phone, is_demo: dealer.is_demo },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return res.json({
+      token,
+      dealer: {
+        id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
+        phone: dealer.phone, email: dealer.email, language: dealer.language,
+        plan: dealer.plan, is_demo: dealer.is_demo,
+      },
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
+    console.error('Google auth error:', err);
+    return res.status(401).json({ error: 'Google sign-in failed' });
+  }
+});
+
+// GET /api/auth/me
 router.get('/me', async (req, res) => {
   try {
     const auth = req.headers.authorization;
@@ -93,14 +151,19 @@ router.get('/me', async (req, res) => {
     const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { dealer_id: string };
     const dealer = await prisma.dealer.findUnique({ where: { id: payload.dealer_id } });
     if (!dealer) return res.status(404).json({ error: 'Dealer not found' });
-    res.json({ dealer: { id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
-      phone: dealer.phone, email: dealer.email, language: dealer.language, plan: dealer.plan } });
+    return res.json({
+      dealer: {
+        id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
+        phone: dealer.phone, email: dealer.email, language: dealer.language,
+        plan: dealer.plan, is_demo: dealer.is_demo,
+      },
+    });
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
-// PATCH /api/auth/profile  (update dealer profile)
+// PATCH /api/auth/profile
 router.patch('/profile', async (req, res) => {
   try {
     const auth = req.headers.authorization;
@@ -122,14 +185,16 @@ router.patch('/profile', async (req, res) => {
       data: { ...data, updated_at: new Date() },
     });
 
-    res.json({
-      dealer: { id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
-        phone: dealer.phone, email: dealer.email, language: dealer.language, plan: dealer.plan },
+    return res.json({
+      dealer: {
+        id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
+        phone: dealer.phone, email: dealer.email, language: dealer.language, plan: dealer.plan,
+      },
       success: true,
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-    res.status(500).json({ error: 'Profile update failed' });
+    return res.status(500).json({ error: 'Profile update failed' });
   }
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
 import { X, Loader2 } from 'lucide-react';
 
@@ -70,12 +70,26 @@ export const Select: React.FC<SelectProps> = ({ label, options, className, ...pr
 // MODAL
 interface ModalProps { open: boolean; onClose: () => void; title: string; children: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl'; }
 export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = 'md' }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panelRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className={cn('glass rounded-2xl w-full relative z-10 shadow-[0_24px_64px_rgba(0,0,0,0.6)] flex flex-col max-h-[90vh]', sizes[size])} onClick={e => e.stopPropagation()}>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={cn('glass rounded-2xl w-full relative z-10 shadow-[0_24px_64px_rgba(0,0,0,0.6)] flex flex-col max-h-[90vh] outline-none', sizes[size])} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)] flex-shrink-0">
           <h2 className="font-display font-semibold text-lg text-[var(--text-primary)]">{title}</h2>
           <button aria-label="Close" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-lg hover:bg-[rgba(255,255,255,0.05)]"><X size={18} /></button>

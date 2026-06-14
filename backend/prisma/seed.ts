@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { resetDemoData, DEMO_DEALER_ID, DEMO_PHONE, DEMO_PASSWORD } from '../src/lib/demoSeed.js';
 
 const prisma = new PrismaClient();
 
@@ -52,8 +53,8 @@ async function main() {
 
   // Campaigns
   const campaigns = await Promise.all([
-    prisma.campaign.upsert({ where: { id: 'camp1' }, update: {}, create: { id: 'camp1', dealer_id: 'd1', name: 'Rabi Season Outreach 2025', type: 'whatsapp', status: 'running', total_contacts: 450, sent: 312, responses: 67, interested: 23 } }),
-    prisma.campaign.upsert({ where: { id: 'camp2' }, update: {}, create: { id: 'camp2', dealer_id: 'd1', name: 'Used Tractor Clearance', type: 'voice', status: 'idle', total_contacts: 120, sent: 0, responses: 0, interested: 0 } }),
+    prisma.campaign.upsert({ where: { id: 'camp1' }, update: {}, create: { id: 'camp1', dealer_id: 'd1', name: 'Rabi Season Outreach 2025', goal: 'Re-engage farmers for the Rabi season', channels: ['whatsapp'], status: 'running', total_contacts: 450, sent: 312, responses: 67, interested: 23 } }),
+    prisma.campaign.upsert({ where: { id: 'camp2' }, update: {}, create: { id: 'camp2', dealer_id: 'd1', name: 'Used Tractor Clearance', goal: 'Move aging used-tractor stock', channels: ['voice'], status: 'idle', total_contacts: 120, sent: 0, responses: 0, interested: 0 } }),
   ]);
   console.log('Campaigns:', campaigns.length);
 
@@ -61,9 +62,13 @@ async function main() {
   await prisma.accountant.upsert({
     where: { id: 'acc1' },
     update: {},
-    create: { id: 'acc1', dealer_id: 'd1', name: 'CA Mehta & Associates', phone: '9876500001', email: 'mehta@caoffice.com', preferred_channel: 'whatsapp' },
+    create: { id: 'acc1', dealer_id: 'd1', name: 'CA Mehta & Associates', phone: '9876500001', email: 'mehta@caoffice.com', is_default: true, tally_enabled: true },
   });
   console.log('Accountant seeded');
+
+  // ─── Demo account (for client demos) ──────────────────────────────────
+  await resetDemoData(prisma);
+  console.log(`Demo account seeded → phone ${DEMO_PHONE} / password ${DEMO_PASSWORD} (id: ${DEMO_DEALER_ID})`);
 
   console.log('\nSeed complete!');
 }

@@ -65,7 +65,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="flex-1 overflow-auto">
-      <Header title="Dashboard" subtitle={`Good morning, ${dealer?.name ?? 'Dealer'} · ${dealer?.city ?? ''}, ${dealer?.state ?? ''}`} />
+      <Header title="Dashboard" subtitle={[`${new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, ${dealer?.name ?? 'Dealer'}`, [dealer?.city, dealer?.district].filter(Boolean).join(', ')].filter(Boolean).join(' · ')} />
       <div className="p-6 space-y-6 page-enter">
 
         {/* Metrics Grid */}

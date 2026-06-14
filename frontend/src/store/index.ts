@@ -11,6 +11,7 @@ interface DealerProfile {
   language: string;
   phone?: string;
   plan?: string;
+  is_demo?: boolean;
 }
 
 interface AppStore {
@@ -19,6 +20,7 @@ interface AppStore {
   dealer: DealerProfile | null;
   setAuth: (token: string, dealer: DealerProfile) => void;
   clearAuth: () => void;
+  setLanguage: (language: string) => void;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -57,8 +59,10 @@ interface AppStore {
 
   // Notifications
   notifications: { id: string; title: string; message: string; type: 'success' | 'error' | 'info'; }[];
+  toasts: { id: string; title: string; message: string; type: 'success' | 'error' | 'info'; }[];
   addNotification: (n: Omit<AppStore['notifications'][0], 'id'>) => void;
   removeNotification: (id: string) => void;
+  dismissToast: (id: string) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -68,6 +72,7 @@ export const useAppStore = create<AppStore>()(
       dealer: null,
       setAuth: (token, dealer) => set({ token, dealer }),
       clearAuth: () => set({ token: null, dealer: null }),
+      setLanguage: (language) => set((s) => ({ dealer: s.dealer ? { ...s.dealer, language } : s.dealer })),
       sidebarOpen: true,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       contacts: [],
@@ -88,15 +93,18 @@ export const useAppStore = create<AppStore>()(
       openScriptModal: (type, context) => set({ scriptModal: { open: true, type, context } }),
       closeScriptModal: () => set({ scriptModal: { open: false, type: '' } }),
       notifications: [],
+      toasts: [],
       addNotification: (n) => {
-        const id = Date.now().toString();
-        set((s) => ({ notifications: [...s.notifications, { ...n, id }] }));
-        // Auto-dismiss after 4s
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const notif = { ...n, id };
+        // Keep it in the bell (capped at 50), and show a transient toast that auto-dismisses.
+        set((s) => ({ notifications: [notif, ...s.notifications].slice(0, 50), toasts: [...s.toasts, notif] }));
         setTimeout(() => {
-          set((s) => ({ notifications: s.notifications.filter(x => x.id !== id) }));
+          set((s) => ({ toasts: s.toasts.filter(t => t.id !== id) }));
         }, 4000);
       },
-      removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter(n => n.id !== id) })),
+      removeNotification: (id) => set((s) => ({ notifications: s.notifications.filter(n => n.id !== id), toasts: s.toasts.filter(t => t.id !== id) })),
+      dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter(t => t.id !== id) })),
     }),
     {
       name: 'agrodesk-auth',

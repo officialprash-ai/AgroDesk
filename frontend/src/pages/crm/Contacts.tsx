@@ -55,7 +55,7 @@ export const Contacts: React.FC = () => {
     setAddLoading(false);
   };
 
-  const { data, refetch } = useApi(() => api.contacts.list(dealerId, { limit: 200 }), [dealerId]);
+  const { data, loading, error, refetch } = useApi(() => api.contacts.list(dealerId, { limit: 200 }), [dealerId]);
   const contacts = data?.contacts ?? [];
 
   const tabs = STAGE_TABS.map(t => ({ ...t, count: t.id === 'all' ? contacts.length : contacts.filter(c => c.lead_status === t.id).length }));
@@ -126,7 +126,15 @@ export const Contacts: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(c => (
+                {loading ? (
+                  [...Array(6)].map((_, i) => (
+                    <tr key={`sk-${i}`}><td colSpan={8}><div className="skeleton h-9 rounded-lg my-1" /></td></tr>
+                  ))
+                ) : error ? (
+                  <tr><td colSpan={8} className="text-center py-10 text-sm text-red-400">Couldn't load contacts — <button onClick={refetch} className="underline hover:text-red-300">retry</button></td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-12 text-sm text-[var(--text-muted)]">{contacts.length === 0 ? 'No contacts yet — add your first contact to get started.' : 'No contacts match your filters.'}</td></tr>
+                ) : filtered.map(c => (
                   <tr key={c.id}>
                     <td>
                       <div className="flex items-center gap-3">

@@ -20,6 +20,7 @@ model Dealer {
   language     String   @default("mr")
   plan          String   @default("growth")
   password_hash String   @default("")
+  google_id     String?  @unique
   is_demo       Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at   DateTime @updatedAt

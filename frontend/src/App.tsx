@@ -75,13 +75,26 @@ const Analytics: React.FC = () => {
   );
 };
 
-const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex h-screen overflow-hidden">
-    <Sidebar />
-    <main className="flex-1 flex flex-col overflow-hidden min-w-0">{children}</main>
-    <AIScriptModal />
+const DemoBanner: React.FC = () => (
+  <div className="flex items-center justify-center gap-2 px-4 py-1.5 bg-amber-400/15 border-b border-amber-400/30 text-amber-300 text-xs font-medium">
+    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+    Demo Mode — explore freely. Outbound calls &amp; messages are simulated, and data resets on each login.
   </div>
 );
+
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { dealer } = useAppStore();
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {dealer?.is_demo && <DemoBanner />}
+        {children}
+      </main>
+      <AIScriptModal />
+    </div>
+  );
+};
 
 function App() {
   const { token } = useAppStore();

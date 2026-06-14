@@ -10,17 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.101.0",
-    "@tanstack/react-table": "^8.21.3",
+    "@react-oauth/google": "^0.13.5",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
-    "framer-motion": "^12.40.0",
     "lucide-react": "^1.17.0",
-    "motion": "^12.40.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-dropzone": "^15.0.0",
-    "react-hook-form": "^7.78.0",
     "react-router-dom": "^7.17.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",

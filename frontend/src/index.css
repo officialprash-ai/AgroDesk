@@ -13,7 +13,7 @@
   --border-bright: rgba(74, 222, 128, 0.25);
   --text-primary: #f0fdf4;
   --text-secondary: rgba(240, 253, 244, 0.6);
-  --text-muted: rgba(240, 253, 244, 0.35);
+  --text-muted: rgba(240, 253, 244, 0.55);
 }
 
 * { box-sizing: border-box; }

@@ -12,6 +12,8 @@ import dashboardRouter from './routes/dashboard.js';
 import documentsRouter from './routes/documents.js';
 import authRouter from './routes/auth.js';
 import { authMiddleware } from './middleware/auth.js';
+import { demoGuard } from './middleware/demoGuard.js';
+import { resetDemoData, DEMO_PHONE, DEMO_PASSWORD } from './lib/demoSeed.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,12 +41,14 @@ app.get('/api/health', async (_, res) => {
 app.use('/api/auth', authRouter);
 
 // ─── DOMAIN ROUTES (protected) ──────────────────────────────
-app.use('/api/contacts', authMiddleware, contactsRouter);
-app.use('/api/campaigns', authMiddleware, campaignsRouter);
-app.use('/api/recovery', authMiddleware, recoveryRouter);
-app.use('/api/tractors', authMiddleware, tractorsRouter);
-app.use('/api/dashboard', authMiddleware, dashboardRouter);
-app.use('/api/documents', authMiddleware, documentsRouter);
+// demoGuard runs after auth: for demo accounts it simulates real-outbound
+// and destructive actions instead of executing them.
+app.use('/api/contacts', authMiddleware, demoGuard, contactsRouter);
+app.use('/api/campaigns', authMiddleware, demoGuard, campaignsRouter);
+app.use('/api/recovery', authMiddleware, demoGuard, recoveryRouter);
+app.use('/api/tractors', authMiddleware, demoGuard, tractorsRouter);
+app.use('/api/dashboard', authMiddleware, demoGuard, dashboardRouter);
+app.use('/api/documents', authMiddleware, demoGuard, documentsRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -187,6 +191,16 @@ Scope: tractor sales only. Escalate complex legal/financial questions to human a
 app.post('/api/jobs', async (req, res) => {
   try {
     const { dealer_id, agent_type, payload, scheduled_for } = req.body;
+
+    // Demo accounts never queue real agent jobs (which would place calls /
+    // send messages). Return a simulated success so the UI flows normally.
+    if (dealer_id) {
+      const dealer = await prisma.dealer.findUnique({ where: { id: dealer_id }, select: { is_demo: true } });
+      if (dealer?.is_demo) {
+        return res.json({ success: true, demo: true, simulated: true, message: 'Demo mode: agent job simulated — no real calls or messages were sent.' });
+      }
+    }
+
     const job = await prisma.agentJob.create({
       data: {
         dealer_id,
@@ -267,4 +281,10 @@ process.on('SIGTERM', async () => {
 // ─── START SERVER ────────────────────────────────────────────
 app.listen(Number(PORT), () => {
   console.log(`🚜 AgroDesk API listening on port ${PORT}`);
+
+  // Ensure the demo account exists and is in a clean state on boot, so client
+  // demos always have a working login. Best-effort: never crash the server.
+  resetDemoData(prisma)
+    .then(() => console.log(`✨ Demo account ready → phone ${DEMO_PHONE} / password ${DEMO_PASSWORD}`))
+    .catch(err => console.error('Demo account bootstrap skipped:', err?.message ?? err));
 });

@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { cn, LANGUAGES } from '../../lib/utils';
 
 export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => {
-  const { notifications, removeNotification, dealer } = useAppStore();
+  const { notifications, removeNotification, toasts, dismissToast, dealer, setLanguage } = useAppStore();
   const [showNotifs, setShowNotifs] = useState(false);
-  const [lang] = useState(dealer?.language ?? 'mr');
+  const [showLangMenu, setShowLangMenu] = useState(false);
+  const lang = dealer?.language ?? 'mr';
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   const initials = dealer?.name
     ? dealer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : 'AD';
@@ -21,25 +23,40 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
 
         <div className="flex items-center gap-3">
           {/* Search */}
-          <div className="relative hidden md:block">
+          <div className="relative hidden md:block" title="Global search — coming soon">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
-              placeholder="Search contacts, tractors..."
-              className="ag-input pl-8 py-2 text-xs w-56 rounded-xl"
+              disabled
+              placeholder="Search (coming soon)"
+              className="ag-input pl-8 py-2 text-xs w-56 rounded-xl opacity-50 cursor-not-allowed"
             />
           </div>
 
           {/* Language switcher */}
           <div className="relative">
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:border-[var(--border-bright)] transition-all">
+            <button aria-label="Change language" aria-haspopup="true" aria-expanded={showLangMenu}
+              onClick={() => setShowLangMenu(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:border-[var(--border-bright)] transition-all">
               <Globe size={13} />
               <span className="hidden sm:block">{LANGUAGES.find(l => l.code === lang)?.label}</span>
             </button>
+            {showLangMenu && (
+              <div className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-[var(--border)] shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden z-50 py-1 max-h-72 overflow-y-auto">
+                {LANGUAGES.map(l => (
+                  <button key={l.code} onClick={() => { setLanguage(l.code); setShowLangMenu(false); }}
+                    className={cn('w-full text-left px-3 py-2 text-xs hover:bg-[rgba(255,255,255,0.05)] transition-colors flex items-center justify-between',
+                      l.code === lang ? 'text-brand-400' : 'text-[var(--text-secondary)]')}>
+                    <span>{l.label}</span><span className="text-[10px] text-[var(--text-muted)]">{l.english}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Voice indicator */}
-          <button aria-label="Voice input" className="relative p-2 rounded-xl glass border border-[var(--border)] hover:border-[var(--border-bright)] transition-all group">
-            <Mic size={15} className="text-[var(--text-secondary)] group-hover:text-brand-400 transition-colors" />
+          <button aria-label="Voice input (coming soon)" disabled title="Voice input — coming soon"
+            className="relative p-2 rounded-xl glass border border-[var(--border)] opacity-50 cursor-not-allowed transition-all">
+            <Mic size={15} className="text-[var(--text-secondary)]" />
           </button>
 
           {/* Notifications */}
@@ -50,8 +67,8 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
               className="relative p-2 rounded-xl glass border border-[var(--border)] hover:border-[var(--border-bright)] transition-all">
               <Bell size={15} className="text-[var(--text-secondary)]" />
               {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-400 text-surface-900 text-[9px] font-bold flex items-center justify-center">
-                  {notifications.length}
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-brand-400 text-surface-900 text-[9px] font-bold flex items-center justify-center">
+                  {notifications.length > 9 ? '9+' : notifications.length}
                 </span>
               )}
             </button>
@@ -91,8 +108,8 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
       </header>
 
       {/* Toast notifications */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-        {notifications.slice(-3).map(n => (
+      <div aria-live="polite" className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.slice(-3).map(n => (
           <div key={n.id} className={cn('flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl glass pointer-events-auto border', 'page-enter',
             n.type === 'success' ? 'border-brand-400/30' : n.type === 'error' ? 'border-red-400/30' : 'border-blue-400/30')}>
             {n.type === 'success' ? <CheckCircle size={14} className="text-brand-400" /> :
@@ -102,7 +119,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
               <p className="text-xs font-semibold text-[var(--text-primary)]">{n.title}</p>
               <p className="text-xs text-[var(--text-muted)]">{n.message}</p>
             </div>
-            <button onClick={() => removeNotification(n.id)} className="ml-2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={12} /></button>
+            <button aria-label="Dismiss" onClick={() => dismissToast(n.id)} className="ml-2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={12} /></button>
           </div>
         ))}
       </div>

@@ -5,15 +5,15 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { BILL_CATEGORIES } from '../../lib/utils';
-import { FileText, Upload, Send, CheckCircle, Clock, Plus, Phone, Mail, Building, ChevronRight, Camera } from 'lucide-react';
+import { FileText, Upload, Send, CheckCircle, Clock, Plus, Phone, Mail, Building, ChevronRight, Camera, Tractor, Cog, Wrench, Banknote, Folder } from 'lucide-react';
 
 const MONTH_STEPS = [
-  { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: '🚜' },
-  { key: 'tractor_sales', label: 'Tractor Sales Bills', icon: '📋' },
-  { key: 'spare_purchase', label: 'Spare Parts Purchase', icon: '⚙️' },
-  { key: 'spare_sales', label: 'Spare Parts Sales', icon: '🔧' },
-  { key: 'cash_voucher', label: 'Cash Vouchers / Payment Receipts', icon: '💵' },
-  { key: 'other', label: 'Other Bills', icon: '📁' },
+  { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: Tractor },
+  { key: 'tractor_sales', label: 'Tractor Sales Bills', icon: FileText },
+  { key: 'spare_purchase', label: 'Spare Parts Purchase', icon: Cog },
+  { key: 'spare_sales', label: 'Spare Parts Sales', icon: Wrench },
+  { key: 'cash_voucher', label: 'Cash Vouchers / Payment Receipts', icon: Banknote },
+  { key: 'other', label: 'Other Bills', icon: Folder },
 ];
 
 const CURRENT_PERIOD = new Date().toISOString().slice(0, 7); // "YYYY-MM"
@@ -172,7 +172,7 @@ export const AIAccountant: React.FC = () => {
                 return (
                   <Card key={cat.key} hover className="cursor-pointer" onClick={() => { setShowWizard(true); setStep(MONTH_STEPS.findIndex(s => s.key === cat.key)); }}>
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl">{cat.icon}</div>
+                      <cat.icon size={22} color={cat.color} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{cat.label}</p>
                         <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -305,7 +305,7 @@ export const AIAccountant: React.FC = () => {
             </div>
             <p className="text-xs text-[var(--text-muted)]">Step {step + 1} of {MONTH_STEPS.length}</p>
             <div className="text-center py-2">
-              <div className="text-4xl mb-2">{currentStep.icon}</div>
+              <currentStep.icon size={32} className="mx-auto mb-2 text-brand-400" />
               <h3 className="text-base font-display font-bold text-[var(--text-primary)]">{currentStep.label}</h3>
               <p className="text-xs text-[var(--text-muted)] mt-1">Do you have {currentStep.label.toLowerCase()} for {CURRENT_PERIOD}?</p>
             </div>
@@ -319,9 +319,11 @@ export const AIAccountant: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="h-28 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)]" onClick={() => handleUpload(false)}>
+                <div role="button" tabIndex={0} aria-label="Upload or scan a bill"
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleUpload(false); } }}
+                  className="h-28 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50" onClick={() => handleUpload(false)}>
                   <Camera size={20} className="text-[var(--text-muted)] mb-2" />
-                  <p className="text-sm text-[var(--text-secondary)]">📷 Scan from phone camera</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Scan from phone camera</p>
                   <p className="text-xs text-[var(--text-muted)]">or upload PDF/image</p>
                 </div>
                 <div className="flex gap-2">
@@ -347,16 +349,18 @@ export const AIAccountant: React.FC = () => {
                 <p className="text-sm text-[var(--text-secondary)]">No accountants added yet. Add one in the Accountants tab first.</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2" role="radiogroup" aria-label="Select accountant">
                 {accountants.map((acc: any) => (
                   <div key={acc.id} onClick={() => setSelectedAcc(acc.id)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedAcc === acc.id ? 'border-brand-400/40 bg-[rgba(74,222,128,0.08)]' : 'border-[var(--border)] hover:border-[var(--border-bright)]'}`}>
+                    role="radio" tabIndex={0} aria-checked={selectedAcc === acc.id}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedAcc(acc.id); } }}
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50 ${selectedAcc === acc.id ? 'border-brand-400/40 bg-[rgba(74,222,128,0.08)]' : 'border-[var(--border)] hover:border-[var(--border-bright)]'}`}>
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedAcc === acc.id ? 'border-brand-400' : 'border-[var(--border)]'}`}>
                       {selectedAcc === acc.id && <div className="w-2 h-2 rounded-full bg-brand-400" />}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-[var(--text-primary)]">{acc.name}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{acc.tally_enabled ? '🔗 Tally sync' : '📦 Package & send'} · {acc.email}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{acc.tally_enabled ? 'Tally sync' : 'Package & send'} · {acc.email}</p>
                     </div>
                     {acc.is_default && <Badge variant="active">Default</Badge>}
                   </div>
@@ -365,7 +369,7 @@ export const AIAccountant: React.FC = () => {
             )}
             <div className="p-3 rounded-xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)]">
               <p className="text-xs text-[var(--text-secondary)]">
-                📊 Summary: {Object.values(uploaded).filter(u => !u.skipped).length} categories uploaded,{' '}
+                Summary: {Object.values(uploaded).filter(u => !u.skipped).length} categories uploaded,{' '}
                 {Object.values(uploaded).filter(u => u.skipped).length} skipped
               </p>
             </div>
