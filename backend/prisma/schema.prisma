@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Dealer {
@@ -19,6 +20,7 @@ model Dealer {
   language     String   @default("mr")
   plan          String   @default("growth")
   password_hash String   @default("")
+  is_demo       Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at   DateTime @updatedAt
 
@@ -181,6 +183,4 @@ model AgentJob {
   created_at       DateTime @default(now())
 
   dealer           Dealer   @relation(fields: [dealer_id], references: [id])
-  @@index([dealer_id, agent_type, status])
-  @@map("agent_jobs")
-}
+  @@index([dealer_id, agent_type,
