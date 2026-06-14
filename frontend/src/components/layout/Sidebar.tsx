@@ -5,10 +5,16 @@ import { useAppStore } from '../../store';
 import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
-  Tractor, Zap, BarChart2, LogOut, HelpCircle
+  Tractor, Zap, BarChart2, LogOut, HelpCircle,
+  TrendingUp, Tag, Clock, Mic, Sparkles, Calculator
 } from 'lucide-react';
 
-const NAV = [
+type LucideIcon = React.ComponentType<{ size?: number; className?: string }>;
+
+const NAV: Array<
+  | { section: string }
+  | { to: string; icon: LucideIcon; label: string; exact?: boolean; badgeIcon?: LucideIcon; badgeColor?: string }
+> = [
   { section: 'OVERVIEW' },
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/analytics', icon: BarChart2, label: 'Analytics' },
@@ -16,15 +22,15 @@ const NAV = [
   { to: '/crm/contacts', icon: Users, label: 'Contacts' },
   { to: '/crm/pipeline', icon: Zap, label: 'Pipeline' },
   { section: 'AGENTS' },
-  { to: '/sales-engine', icon: Megaphone, label: 'Sales Engine', badge: 'A' },
-  { to: '/used-tractor', icon: Truck, label: 'Used Tractor', badge: 'B' },
-  { to: '/money-recovery', icon: IndianRupee, label: 'Money Recovery', badge: 'C' },
-  { to: '/cold-calling', icon: Phone, label: 'Cold Calling', badge: 'D' },
-  { to: '/ai-salesman', icon: Bot, label: 'AI Salesman', badge: 'E' },
-  { to: '/ai-accountant', icon: FileText, label: 'AI Accountant', badge: 'F' },
+  { to: '/sales-engine',   icon: Megaphone,    label: 'Sales Engine',   badgeIcon: TrendingUp,  badgeColor: '#4ade80' },
+  { to: '/used-tractor',   icon: Truck,         label: 'Used Tractor',   badgeIcon: Tag,         badgeColor: '#60a5fa' },
+  { to: '/money-recovery', icon: IndianRupee,   label: 'Money Recovery', badgeIcon: Clock,       badgeColor: '#fbbf24' },
+  { to: '/cold-calling',   icon: Phone,         label: 'Cold Calling',   badgeIcon: Mic,         badgeColor: '#a78bfa' },
+  { to: '/ai-salesman',    icon: Bot,           label: 'AI Salesman',    badgeIcon: Sparkles,    badgeColor: '#34d399' },
+  { to: '/ai-accountant',  icon: FileText,      label: 'AI Accountant',  badgeIcon: Calculator,  badgeColor: '#fb923c' },
   { section: 'SYSTEM' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
-  { to: '/help', icon: HelpCircle, label: 'Help & Support' },
+  { to: '/settings', icon: Settings,    label: 'Settings' },
+  { to: '/help',     icon: HelpCircle,  label: 'Help & Support' },
 ];
 
 export const Sidebar: React.FC = () => {
@@ -80,7 +86,9 @@ export const Sidebar: React.FC = () => {
             ) : <div key={i} className="my-2 h-px bg-[var(--border)] mx-2" />;
           }
           const Icon = item.icon;
-          const isActive = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
+          const BadgeIcon = 'badgeIcon' in item ? item.badgeIcon : undefined;
+          const badgeColor = 'badgeColor' in item ? item.badgeColor : undefined;
+          const isActive = 'exact' in item && item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
           return (
             <NavLink key={item.to} to={item.to}
               className={cn(
@@ -93,9 +101,17 @@ export const Sidebar: React.FC = () => {
               {sidebarOpen && (
                 <>
                   <span className="flex-1 truncate">{item.label}</span>
-                  {item.badge && (
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-[rgba(74,222,128,0.12)] text-brand-400 border border-[rgba(74,222,128,0.2)]">
-                      {item.badge}
+                  {BadgeIcon && badgeColor && (
+                    <span
+                      className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+                      style={{
+                        backgroundColor: `${badgeColor}18`,
+                        border: `1px solid ${badgeColor}35`,
+                        color: badgeColor,
+                      }}
+                      title={item.label}
+                    >
+                      <BadgeIcon size={10} />
                     </span>
                   )}
                 </>
