@@ -32,9 +32,9 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className={cn(
-      'flex flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out flex-shrink-0 z-40',
+      'relative flex flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out flex-shrink-0 z-40',
       'border-r border-[var(--border)]',
-      'bg-[linear-gradient(180deg,rgba(6,26,12,0.95)_0%,rgba(2,12,7,0.98)_100%)]',
+      'bg-[var(--bg-mid)]',
       sidebarOpen ? 'w-60' : 'w-16'
     )}>
       {/* Logo */}
@@ -103,6 +103,42 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* Tractor watermark — agro decorative element */}
+      {sidebarOpen && (
+        <div className="pointer-events-none select-none flex justify-center pb-2 opacity-[0.07]" aria-hidden="true">
+          <svg className="w-28 h-auto text-brand-400 tractor-float" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Large rear wheel */}
+            <circle cx="44" cy="64" r="28" stroke="currentColor" strokeWidth="3"/>
+            <circle cx="44" cy="64" r="19" stroke="currentColor" strokeWidth="1.5" strokeDasharray="6 5"/>
+            <circle cx="44" cy="64" r="4" fill="currentColor"/>
+            {/* Spokes */}
+            <line x1="44" y1="36" x2="44" y2="92" stroke="currentColor" strokeWidth="1.2"/>
+            <line x1="16" y1="64" x2="72" y2="64" stroke="currentColor" strokeWidth="1.2"/>
+            <line x1="24" y1="44" x2="64" y2="84" stroke="currentColor" strokeWidth="1.2"/>
+            <line x1="64" y1="44" x2="24" y2="84" stroke="currentColor" strokeWidth="1.2"/>
+            {/* Small front wheel */}
+            <circle cx="122" cy="72" r="19" stroke="currentColor" strokeWidth="2.5"/>
+            <circle cx="122" cy="72" r="11" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3"/>
+            <circle cx="122" cy="72" r="3" fill="currentColor"/>
+            {/* Axle bar */}
+            <rect x="44" y="54" width="80" height="9" rx="3" fill="currentColor" opacity="0.5"/>
+            {/* Cab body */}
+            <rect x="50" y="24" width="34" height="34" rx="4" fill="currentColor" opacity="0.3"/>
+            <rect x="50" y="24" width="34" height="34" rx="4" stroke="currentColor" strokeWidth="2"/>
+            {/* Cab window */}
+            <rect x="55" y="28" width="24" height="16" rx="2" fill="currentColor" opacity="0.45"/>
+            {/* Engine hood */}
+            <rect x="82" y="30" width="30" height="24" rx="3" fill="currentColor" opacity="0.45"/>
+            {/* Exhaust */}
+            <rect x="108" y="18" width="5" height="17" rx="2.5" fill="currentColor" opacity="0.7"/>
+            {/* Headlamp */}
+            <circle cx="113" cy="38" r="5" fill="currentColor" opacity="0.6"/>
+            {/* Ground shadow line */}
+            <path d="M18 92 Q81 98 148 92" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/>
+          </svg>
+        </div>
+      )}
 
       {/* Collapse toggle + Logout */}
       <div className="p-3 border-t border-[var(--border)] space-y-1">

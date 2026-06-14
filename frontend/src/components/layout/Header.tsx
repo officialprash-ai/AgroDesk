@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info, Sun, Moon, CloudMoon } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { cn, LANGUAGES } from '../../lib/utils';
 
 export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => {
-  const { notifications, removeNotification, toasts, dismissToast, dealer, setLanguage } = useAppStore();
+  const { notifications, removeNotification, toasts, dismissToast, dealer, setLanguage, theme, setTheme } = useAppStore();
+
+  const THEMES: { key: 'dark' | 'light' | 'night'; icon: React.ReactNode; label: string }[] = [
+    { key: 'dark',  icon: <Moon size={13} />,       label: 'Dark' },
+    { key: 'light', icon: <Sun size={13} />,         label: 'Light' },
+    { key: 'night', icon: <CloudMoon size={13} />,   label: 'Night' },
+  ];
+  const nextTheme = (): void => {
+    const order: Array<'dark' | 'light' | 'night'> = ['dark', 'light', 'night'];
+    const idx = order.indexOf(theme ?? 'dark');
+    setTheme(order[(idx + 1) % order.length]);
+  };
+  const currentTheme = THEMES.find(t => t.key === (theme ?? 'dark')) ?? THEMES[0];
   const [showNotifs, setShowNotifs] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const lang = dealer?.language ?? 'mr';
@@ -15,7 +27,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[rgba(2,12,7,0.85)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur-xl">
         <div>
           <h1 className="font-display font-semibold text-xl text-[var(--text-primary)]">{title}</h1>
           {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
@@ -57,6 +69,17 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
           <button aria-label="Voice input (coming soon)" disabled title="Voice input — coming soon"
             className="relative p-2 rounded-xl glass border border-[var(--border)] opacity-50 cursor-not-allowed transition-all">
             <Mic size={15} className="text-[var(--text-secondary)]" />
+          </button>
+
+          {/* Theme toggle */}
+          <button
+            aria-label={`Switch theme (current: ${currentTheme.label})`}
+            title={`Theme: ${currentTheme.label} — click to switch`}
+            onClick={nextTheme}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl glass border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:border-[var(--border-bright)] hover:text-[var(--text-primary)] transition-all"
+          >
+            {currentTheme.icon}
+            <span className="hidden sm:block">{currentTheme.label}</span>
           </button>
 
           {/* Notifications */}

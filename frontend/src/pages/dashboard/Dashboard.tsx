@@ -68,6 +68,51 @@ export const Dashboard: React.FC = () => {
       <Header title="Dashboard" subtitle={[`${new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, ${dealer?.name ?? 'Dealer'}`, [dealer?.city, dealer?.district].filter(Boolean).join(', ')].filter(Boolean).join(' · ')} />
       <div className="p-6 space-y-6 page-enter">
 
+        {/* Agro season banner */}
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--border-brand)] bg-[rgba(34,197,94,0.04)] px-6 py-4">
+          {/* Wheat stalks — left */}
+          <div className="absolute left-4 top-0 bottom-0 flex items-end gap-2 opacity-[0.18] pointer-events-none select-none" aria-hidden="true">
+            {[0,1,2].map(i => (
+              <svg key={i} className="h-14 w-5 text-brand-400" style={{ transform: `rotate(${[-4,0,5][i]}deg)` }} viewBox="0 0 20 56" fill="none">
+                <line x1="10" y1="56" x2="10" y2="2" stroke="currentColor" strokeWidth="1.5"/>
+                <ellipse cx="15" cy="10" rx="4" ry="2.2" fill="currentColor" transform="rotate(30 15 10)"/>
+                <ellipse cx="5" cy="18" rx="4" ry="2.2" fill="currentColor" transform="rotate(-30 5 18)"/>
+                <ellipse cx="15" cy="26" rx="4" ry="2.2" fill="currentColor" transform="rotate(30 15 26)"/>
+                <ellipse cx="5" cy="34" rx="4" ry="2.2" fill="currentColor" transform="rotate(-30 5 34)"/>
+                <ellipse cx="10" cy="4" rx="3" ry="1.8" fill="currentColor"/>
+              </svg>
+            ))}
+          </div>
+
+          {/* Center text */}
+          <div className="text-center">
+            <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text-muted)] mb-0.5">Kharif Season 2024 · Maharashtra</p>
+            <p className="text-sm font-display font-medium text-[var(--text-secondary)]">Your dealership intelligence is live and tracking <span className="text-brand-400 font-semibold">{[dealer?.city, dealer?.district].filter(Boolean).join(', ') || 'your region'}</span></p>
+          </div>
+
+          {/* Tractor — right */}
+          <div className="absolute right-5 top-0 bottom-0 flex items-center opacity-[0.14] pointer-events-none select-none" aria-hidden="true">
+            <svg className="h-14 w-auto text-brand-400 tractor-float" viewBox="0 0 110 70" fill="none">
+              <circle cx="28" cy="46" r="20" stroke="currentColor" strokeWidth="2.5"/>
+              <circle cx="28" cy="46" r="13" stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 4"/>
+              <circle cx="28" cy="46" r="3" fill="currentColor"/>
+              <line x1="28" y1="26" x2="28" y2="66" stroke="currentColor" strokeWidth="1"/>
+              <line x1="8" y1="46" x2="48" y2="46" stroke="currentColor" strokeWidth="1"/>
+              <line x1="14" y1="32" x2="42" y2="60" stroke="currentColor" strokeWidth="1"/>
+              <line x1="42" y1="32" x2="14" y2="60" stroke="currentColor" strokeWidth="1"/>
+              <circle cx="88" cy="52" r="14" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="88" cy="52" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3"/>
+              <circle cx="88" cy="52" r="2.5" fill="currentColor"/>
+              <rect x="30" y="38" width="60" height="7" rx="2.5" fill="currentColor" opacity="0.5"/>
+              <rect x="34" y="16" width="24" height="25" rx="3" fill="currentColor" opacity="0.25"/>
+              <rect x="34" y="16" width="24" height="25" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+              <rect x="38" y="20" width="16" height="12" rx="2" fill="currentColor" opacity="0.4"/>
+              <rect x="57" y="21" width="22" height="18" rx="2" fill="currentColor" opacity="0.35"/>
+              <rect x="76" y="12" width="4" height="13" rx="2" fill="currentColor" opacity="0.65"/>
+            </svg>
+          </div>
+        </div>
+
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <MetricCard label="Total Leads" value={mLoading ? '...' : (m?.total_leads ?? 0).toLocaleString()} sub={`+${m?.new_leads_today ?? 0} today`}
