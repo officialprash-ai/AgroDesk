@@ -96,8 +96,24 @@ export const api = {
   },
 
   ai: {
-    script: (type: string, language: string, context?: Record<string, unknown>) => req<{ script: string }>('/api/ai/script', { method: 'POST', body: JSON.stringify({ type, language, context }) }),
-    listing: (tractor: Record<string, unknown>) => req<{ description: string }>('/api/ai/listing', { method: 'POST', body: JSON.stringify({ tractor }) }),
-    respond: (message: string, history: { role: string; content: string }[], language?: string) => req<{ reply: string }>('/api/ai/respond', { method: 'POST', body: JSON.stringify({ message, history, language }) }),
+    script: (type: string, language: string, context?: Record<string, unknown>) =>
+      req<{ script: string }>('/api/ai/script', { method: 'POST', body: JSON.stringify({ type, language, context }) }),
+    listing: (tractor: Record<string, unknown>) =>
+      req<{ description: string }>('/api/ai/listing', { method: 'POST', body: JSON.stringify({ tractor }) }),
+    respond: (message: string, history: { role: string; content: string }[], language?: string, contact_id?: string, dealer_id?: string) =>
+      req<{ reply: string }>('/api/ai/respond', { method: 'POST', body: JSON.stringify({ message, history, language, contact_id, dealer_id }) }),
+  },
+
+  conversations: {
+    list: (dealer_id: string, params?: { contact_id?: string; campaign_id?: string; channel?: string; limit?: number }) => {
+      const q = new URLSearchParams({ dealer_id, ...Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])) });
+      return req<{ conversations: any[]; total: number }>(`/api/conversations?${q}`);
+    },
+    context: (contact_id: string, dealer_id: string) =>
+      req<{ conversations: any[]; summary: string }>(`/api/conversations/context/${contact_id}?dealer_id=${dealer_id}`),
+    create: (data: { dealer_id: string; contact_id: string; campaign_id?: string; channel: string; direction?: string; content: string; status?: string; twilio_sid?: string }) =>
+      req<{ conversation: any; success: boolean }>('/api/conversations', { method: 'POST', body: JSON.stringify(data) }),
+    stats: (dealer_id: string) =>
+      req<{ total: number; byChannel: Record<string, number>; byIntent: Record<string, number>; byDay: { day: string; count: number }[] }>(`/api/conversations/stats/${dealer_id}`),
   },
 };

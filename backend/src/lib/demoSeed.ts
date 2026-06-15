@@ -16,7 +16,8 @@ export const DEMO_PASSWORD = 'demo1234';
  * Safe to call on every demo login. Only ever touches rows owned by the
  * demo dealer, never any real dealer's data.
  */
-export async function resetDemoData(prisma: PrismaClient): Promise<void> {
+export async function resetDemoData(_p: PrismaClient): Promise<void> {
+  const prisma = _p as any;
   const password_hash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   // Ensure the demo dealer exists (and is flagged) before touching children.

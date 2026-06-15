@@ -57,6 +57,7 @@ model Contact {
 
   dealer            Dealer    @relation(fields: [dealer_id], references: [id])
   consents          Consent[]
+  conversations     Conversation[]
   @@map("contacts")
 }
 
@@ -186,4 +187,27 @@ model AgentJob {
   dealer           Dealer   @relation(fields: [dealer_id], references: [id])
   @@index([dealer_id, agent_type, status])
   @@map("agent_jobs")
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  dealer_id    String
+  contact_id   String
+  campaign_id  String?
+  channel      String   // whatsapp | voice | sms | email
+  direction    String   // inbound | outbound
+  content      String   // message text or call transcript/summary
+  status       String   @default("delivered") // sent | delivered | read | failed | answered | missed
+  sentiment    String?  // positive | neutral | negative (AI-labelled)
+  intent       String?  // interested | not_interested | callback | info_request | complaint
+  duration_sec Int?     // for voice calls
+  media_url    String?  // for WhatsApp media messages
+  twilio_sid   String?  @unique // Twilio MessageSid or CallSid
+  created_at   DateTime @default(now())
+
+  contact      Contact  @relation(fields: [contact_id], references: [id])
+  @@index([dealer_id, contact_id, created_at])
+  @@index([dealer_id, campaign_id])
+  @@index([twilio_sid])
+  @@map("conversations")
 }

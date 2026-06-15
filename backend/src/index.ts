@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import Anthropic from '@anthropic-ai/sdk';
-import { prisma } from './lib/prisma.js';
+import { prisma as _prisma } from './lib/prisma.js';
+const prisma = _prisma as any;
 
 import contactsRouter from './routes/contacts.js';
 import campaignsRouter from './routes/campaigns.js';
@@ -11,6 +12,8 @@ import tractorsRouter from './routes/tractors.js';
 import dashboardRouter from './routes/dashboard.js';
 import documentsRouter from './routes/documents.js';
 import authRouter from './routes/auth.js';
+import webhooksRouter from './routes/webhooks.js';
+import conversationsRouter from './routes/conversations.js';
 import { authMiddleware } from './middleware/auth.js';
 import { demoGuard } from './middleware/demoGuard.js';
 import { resetDemoData, DEMO_PHONE, DEMO_PASSWORD } from './lib/demoSeed.js';
@@ -49,6 +52,11 @@ app.use('/api/recovery', authMiddleware, demoGuard, recoveryRouter);
 app.use('/api/tractors', authMiddleware, demoGuard, tractorsRouter);
 app.use('/api/dashboard', authMiddleware, demoGuard, dashboardRouter);
 app.use('/api/documents', authMiddleware, demoGuard, documentsRouter);
+app.use('/api/conversations', authMiddleware, conversationsRouter);
+
+// ─── TWILIO WEBHOOKS (public — Twilio calls these, no JWT) ───
+// Verify in prod with Twilio signature validation middleware
+app.use('/api/webhooks', webhooksRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -151,22 +159,43 @@ Requirements:
   }
 });
 
-// ─── AI — INBOUND SALESMAN ──────────────────────────────────
+// ─── AI — INBOUND SALESMAN (context-aware) ──────────────────
 app.post('/api/ai/respond', authMiddleware, async (req, res) => {
-  const { message, history, context, language } = req.body;
+  const { message, history, context, language, contact_id, dealer_id } = req.body;
   const langNames: Record<string, string> = { mr: 'Marathi', hi: 'Hindi', en: 'English' };
   const langName = langNames[language || 'mr'] || 'Marathi';
+
+  // Fetch cross-channel history for this contact so the AI has full context
+  let contactHistory = '';
+  if (contact_id && dealer_id) {
+    try {
+      const pastConvs = await prisma.conversation.findMany({
+        where: { contact_id, dealer_id },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      });
+      if (pastConvs.length > 0) {
+        contactHistory = '\n\nPrevious interactions with this customer (most recent first):\n' +
+          pastConvs.map((c: any) => {
+            const who = c.direction === 'inbound' ? 'Customer' : 'Agent';
+            const when = new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+            return `[${when} · ${c.channel.toUpperCase()} · ${who}]: ${c.content}`;
+          }).join('\n');
+      }
+    } catch (e) { /* non-fatal */ }
+  }
 
   const systemPrompt = `You are AgroDesk AI Salesman for a tractor dealership in Maharashtra, India.
 You help farmers with tractor enquiries, pricing, EMI information, and booking visits.
 Respond in ${langName}. Be helpful, warm, and knowledgeable about tractors and farm equipment.
 Keep responses concise (2-4 sentences). Use Indian currency (₹).
 Never make up prices — say you'll check and confirm.
-Scope: tractor sales only. Escalate complex legal/financial questions to human agent.`;
+Scope: tractor sales only. Escalate complex legal/financial questions to human agent.
+If the customer has interacted before (see history below), acknowledge continuity naturally — don't repeat what was already discussed.${contactHistory}`;
 
   try {
     const messages = [
-      ...(history || []).map((h: { role: string; content: string }) => ({
+      ...(history || []).map((h: { role: string; content: string }): { role: 'user' | 'assistant'; content: string } => ({
         role: h.role as 'user' | 'assistant',
         content: h.content,
       })),
@@ -181,6 +210,25 @@ Scope: tractor sales only. Escalate complex legal/financial questions to human a
     });
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+
+    // Persist this exchange to conversations table
+    if (contact_id && dealer_id) {
+      await prisma.conversation.create({
+        data: {
+          dealer_id, contact_id,
+          channel: 'whatsapp', direction: 'inbound',
+          content: message, status: 'delivered',
+        },
+      }).catch(() => {});
+      await prisma.conversation.create({
+        data: {
+          dealer_id, contact_id,
+          channel: 'whatsapp', direction: 'outbound',
+          content: reply, status: 'sent',
+        },
+      }).catch(() => {});
+    }
+
     res.json({ reply, language });
   } catch (err) {
     res.status(500).json({ error: 'AI response failed' });
@@ -240,51 +288,13 @@ app.post('/webhooks/exotel/call-status', async (req, res) => {
   console.log('Exotel webhook:', { CallSid, Status, Direction, From, To });
 
   try {
-    // Update the matching agent job
+    const newStatus = Status === 'completed' ? 'completed' : Status === 'failed' ? 'failed' : 'pending';
     await prisma.agentJob.updateMany({
-      where: { payload: { path: ['call_sid'], equals: CallSid } },
-      data: {
-        status: Status === 'completed' ? 'completed' : Status === 'failed' ? 'failed' : 'pending',
-        completed_at: Status === 'completed' ? new Date() : undefined,
-      },
+      where: { idempotency_key: { contains: CallSid } },
+      data: { status: newStatus, completed_at: newStatus === 'completed' ? new Date() : undefined },
     });
   } catch (err) {
     console.error('Exotel webhook error:', err);
   }
   res.sendStatus(200);
-});
-
-app.post('/webhooks/whatsapp', async (req, res) => {
-  const { entry } = req.body;
-  console.log('WhatsApp webhook:', JSON.stringify(entry, null, 2));
-  // Route to AI Salesman agent — TODO: implement inbound routing
-  res.sendStatus(200);
-});
-
-// ─── ERROR HANDLER ───────────────────────────────────────────
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message || 'Internal server error' });
-});
-
-// ─── GRACEFUL SHUTDOWN ───────────────────────────────────────
-process.on('SIGINT', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-// ─── START SERVER ────────────────────────────────────────────
-app.listen(Number(PORT), () => {
-  console.log(`🚜 AgroDesk API listening on port ${PORT}`);
-
-  // Ensure the demo account exists and is in a clean state on boot, so client
-  // demos always have a working login. Best-effort: never crash the server.
-  resetDemoData(prisma)
-    .then(() => console.log(`✨ Demo account ready → phone ${DEMO_PHONE} / password ${DEMO_PASSWORD}`))
-    .catch(err => console.error('Demo account bootstrap skipped:', err?.message ?? err));
 });

@@ -3,7 +3,8 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { prisma } from '../lib/prisma.js';
+import { prisma as _prisma } from '../lib/prisma.js';
+const prisma = _prisma as any;
 import { resetDemoData } from '../lib/demoSeed.js';
 
 const router = Router();
