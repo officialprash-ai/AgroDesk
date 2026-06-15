@@ -9,8 +9,8 @@ import { LANGUAGES } from '../../lib/utils';
 import {
   Megaphone, Plus, Play, Pause, Wand2, Phone, MessageSquare, Mail,
   Users, BarChart2, Target, Zap, Copy, Check, RefreshCw, Upload,
-  Clock, Calendar, Send, TrendingUp, Eye, Edit3, Trash2, X,
-  FileText, ChevronRight, AlertCircle, CheckCircle2,
+  Clock, Calendar, Send, TrendingUp, Eye, Edit3,
+  FileText, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────
