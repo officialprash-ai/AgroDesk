@@ -538,12 +538,10 @@ export const AISalesman: React.FC = () => {
                     onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) { e.preventDefault(); addEntry(); } }} />
                   <div className="flex gap-2">
                     <Button size="sm" icon={<Plus size={12} />} onClick={addEntry} disabled={!kbNewText.trim()} className="flex-1">Add Entry</Button>
-                    <label className="flex-shrink-0 cursor-pointer">
-                      <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={handleFileUpload} disabled={kbUploading} />
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-xl px-3 py-1.5 border transition-all duration-200 ${kbUploading ? 'opacity-50 cursor-not-allowed border-[var(--border)] text-[var(--text-muted)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
-                        <FileUp size={12} />{kbUploading ? 'Reading…' : 'PDF'}
-                      </span>
+                    <label htmlFor="kb-pdf-input" className={`flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-medium rounded-xl px-3 py-1.5 border transition-all duration-200 ${kbUploading ? 'opacity-50 cursor-not-allowed border-[var(--border)] text-[var(--text-muted)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] cursor-pointer'}`}>
+                      <FileUp size={12} />{kbUploading ? 'Reading…' : 'PDF'}
                     </label>
+                    <input id="kb-pdf-input" type="file" accept=".pdf" className="hidden" onChange={e => { handleFileUpload(e); e.target.value = ''; }} disabled={kbUploading} />
                   </div>
                   <p className="text-[9px] text-[var(--text-muted)]">⌘+Enter to add · PDF text extracted automatically</p>
                 </div>

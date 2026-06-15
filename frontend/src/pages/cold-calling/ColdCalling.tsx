@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, ProgressBar, Modal, Select, Input } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -109,7 +109,7 @@ export const ColdCalling: React.FC = () => {
   const [uploadLang, setUploadLang] = useState('mr');
   const [uploadPreview, setUploadPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const [crmModal, setCrmModal] = useState<{ open: boolean; call?: Call }>({ open: false });
   const [crmForm, setCrmForm] = useState({ name: '', phone: '', village: '', language: 'mr' });
@@ -456,17 +456,15 @@ export const ColdCalling: React.FC = () => {
         {/* ── UPLOAD CONTACTS MODAL ────────────────────────── */}
         <Modal open={showUpload} onClose={() => { setShowUpload(false); setUploadPreview([]); }} title="Upload Contact List" size="md">
           <div className="space-y-4">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="h-32 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)]">
+            <label htmlFor="csv-file-input" className="h-32 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)]">
               <Upload size={20} className="text-[var(--text-muted)] mb-2" />
               <p className="text-sm font-medium text-[var(--text-secondary)]">
                 {uploadPreview.length > 0 ? `${uploadPreview.length} contacts parsed ✓` : 'Click to upload CSV / Excel'}
               </p>
               <p className="text-xs text-[var(--text-muted)]">Columns: Name, Phone, Note (optional)</p>
-            </div>
-            <input ref={fileInputRef} type="file" accept=".csv,.txt" className="hidden"
-              onChange={e => handleFileSelect(e.target.files)} />
+            </label>
+            <input id="csv-file-input" type="file" accept=".csv,.txt" className="hidden"
+              onChange={e => { handleFileSelect(e.target.files); e.target.value = ''; }} />
 
             {uploadPreview.length > 0 && (
               <div className="max-h-32 overflow-y-auto space-y-1 border border-[var(--border)] rounded-xl p-2">

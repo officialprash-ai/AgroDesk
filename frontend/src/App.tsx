@@ -100,7 +100,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   const { token, theme } = useAppStore();
 
-  // Sync theme attribute to <html> so CSS variables apply globally
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme ?? 'dark');
   }, [theme]);

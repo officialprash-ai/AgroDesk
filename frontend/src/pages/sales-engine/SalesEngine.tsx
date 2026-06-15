@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, ProgressBar, EmptyState } from '../../components/ui';
@@ -114,7 +114,7 @@ export const SalesEngine: React.FC = () => {
   const [campForm, setCampForm] = useState({ name: '', goal: '', language: 'hi', startDate: '', endDate: '' });
   const [campLoading, setCampLoading] = useState(false);
   const [csvFile, setCsvFile] = useState<string | null>(null);
-  const csvRef = useRef<HTMLInputElement>(null);
+
 
   // template edit
   const [editBody, setEditBody] = useState('');
@@ -426,12 +426,12 @@ export const SalesEngine: React.FC = () => {
           {/* CSV upload */}
           <div>
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">Contact List</label>
-            <input ref={csvRef} type="file" accept=".csv" className="hidden"
-              onChange={e => setCsvFile(e.target.files?.[0]?.name ?? null)} />
-            <button onClick={() => csvRef.current?.click()}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed text-sm transition-all ${csvFile ? 'border-brand-400/40 bg-[rgba(74,222,128,0.04)] text-brand-400' : 'border-[var(--border)] text-[var(--text-muted)] hover:border-brand-400/30 hover:text-brand-400'}`}>
+            <input id="campaign-csv-input" type="file" accept=".csv" className="hidden"
+              onChange={e => { setCsvFile(e.target.files?.[0]?.name ?? null); e.target.value = ''; }} />
+            <label htmlFor="campaign-csv-input"
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed text-sm transition-all cursor-pointer ${csvFile ? 'border-brand-400/40 bg-[rgba(74,222,128,0.04)] text-brand-400' : 'border-[var(--border)] text-[var(--text-muted)] hover:border-brand-400/30 hover:text-brand-400'}`}>
               {csvFile ? <><CheckCircle2 size={14} />{csvFile}</> : <><Upload size={14} />Upload CSV contact list</>}
-            </button>
+            </label>
           </div>
 
           {/* AI hint */}

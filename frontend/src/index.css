@@ -305,7 +305,6 @@ body {
 }
 .color-orb::after {
   background-image: radial-gradient(circle at center, var(--orb-base) var(--orb-dot), transparent var(--orb-dot));
-  background-size: calc(var(--orb-dot) * 2) calc(var(--orb-dot) * 2);
   backdrop-filter: blur(calc(var(--orb-blur) * 2)) contrast(calc(var(--orb-contrast) * 2));
   mix-blend-mode: overlay;
 }

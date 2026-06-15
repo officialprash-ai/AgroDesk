@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Button, Select } from '../ui';
 import { useAppStore } from '../../store';
-import { Sparkles, Copy, RefreshCw, Check, Mic } from 'lucide-react';
+import { Sparkles, Copy, RefreshCw, Check, Mic, Pencil, Save, X } from 'lucide-react';
 import { LANGUAGES } from '../../lib/utils';
 
 const SCRIPT_TYPES = [
@@ -23,10 +23,14 @@ export const AIScriptModal: React.FC = () => {
   const [script, setScript] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState('');
+  const [voiceLoading, setVoiceLoading] = useState(false);
 
   const generateScript = async () => {
     setLoading(true);
     setScript('');
+    setEditing(false);
     try {
       const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
       const res = await fetch(`${BASE}/api/ai/script`, {
@@ -43,9 +47,38 @@ export const AIScriptModal: React.FC = () => {
   };
 
   const copyScript = () => {
-    navigator.clipboard.writeText(script);
+    const text = editing ? editDraft : script;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const startEdit = () => {
+    setEditDraft(script);
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    setScript(editDraft);
+    setEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditDraft('');
+  };
+
+  const handleVoicePreview = async () => {
+    const text = editing ? editDraft : script;
+    if (!text || !window.speechSynthesis) return;
+    setVoiceLoading(true);
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.replace(/\[.*?\]/g, ''));
+    utterance.rate = 0.9;
+    utterance.onend = () => setVoiceLoading(false);
+    utterance.onerror = () => setVoiceLoading(false);
+    window.speechSynthesis.speak(utterance);
+    setVoiceLoading(false);
   };
 
   return (
@@ -59,25 +92,84 @@ export const AIScriptModal: React.FC = () => {
         </div>
 
         <Button onClick={generateScript} loading={loading} icon={<Sparkles size={14} />} className="w-full justify-center">
-          {loading ? 'Generating Script...' : 'Generate with AI'}
+          {loading ? 'Generating Script...' : script ? 'Regenerate Script' : 'Generate with AI'}
         </Button>
 
         {script && (
           <div className="relative">
-            <div className="p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--border)] min-h-[200px]">
-              <pre className="text-sm text-[var(--text-primary)] whitespace-pre-wrap font-body leading-relaxed">{script}</pre>
+            {/* Script header */}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                {editing ? 'Editing script — make your changes below' : 'AI-generated script · edit as needed'}
+              </p>
+              {!editing ? (
+                <button
+                  onClick={startEdit}
+                  className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors px-2 py-1 rounded-lg hover:bg-[rgba(74,222,128,0.08)]"
+                >
+                  <Pencil size={11} /> Edit
+                </button>
+              ) : (
+                <div className="flex gap-1">
+                  <button
+                    onClick={saveEdit}
+                    className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors px-2 py-1 rounded-lg hover:bg-[rgba(74,222,128,0.08)]"
+                  >
+                    <Save size={11} /> Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors px-2 py-1 rounded-lg hover:bg-[rgba(255,255,255,0.05)]"
+                  >
+                    <X size={11} /> Cancel
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2 mt-3">
+
+            {/* Script body */}
+            {editing ? (
+              <textarea
+                value={editDraft}
+                onChange={e => setEditDraft(e.target.value)}
+                rows={12}
+                className="w-full ag-input text-sm leading-relaxed font-body resize-none"
+                placeholder="Edit your script here…"
+                autoFocus
+              />
+            ) : (
+              <div
+                className="p-4 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--border)] min-h-[200px] cursor-text"
+                onClick={startEdit}
+                title="Click to edit"
+              >
+                <pre className="text-sm text-[var(--text-primary)] whitespace-pre-wrap font-body leading-relaxed">{script}</pre>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-3 flex-wrap">
               <Button variant="secondary" size="sm" icon={copied ? <Check size={13} /> : <Copy size={13} />} onClick={copyScript}>
                 {copied ? 'Copied!' : 'Copy Script'}
               </Button>
-              <Button variant="ghost" size="sm" icon={<RefreshCw size={13} />} onClick={generateScript}>
+              <Button variant="ghost" size="sm" icon={<RefreshCw size={13} />} onClick={generateScript} loading={loading}>
                 Regenerate
               </Button>
-              <Button variant="ghost" size="sm" icon={<Mic size={13} />}>
-                Preview Voice
+              <Button variant="ghost" size="sm" icon={<Mic size={13} />} onClick={handleVoicePreview} loading={voiceLoading}>
+                {voiceLoading ? 'Speaking…' : 'Preview Voice'}
               </Button>
+              {editing && (
+                <Button size="sm" icon={<Save size={13} />} onClick={saveEdit} className="ml-auto">
+                  Save Changes
+                </Button>
+              )}
             </div>
+
+            {/* Word count */}
+            <p className="text-[10px] text-[var(--text-muted)] mt-2">
+              {(editing ? editDraft : script).split(/\s+/).filter(Boolean).length} words ·
+              {' '}{Math.ceil((editing ? editDraft : script).split(/\s+/).filter(Boolean).length / 130)} min read aloud
+            </p>
           </div>
         )}
 
@@ -100,12 +192,12 @@ function getFallbackScript(type: string, lang: string): string {
     cold_call_new: {
       mr: `नमस्कार! मी [तुमचे नाव] बोलतोय, [डीलरशिप नाव] कडून.
 
-आपण नवीन ट्रॅक्टर घेण्याचा विचार करत आहात का? 
+आपण नवीन ट्रॅक्टर घेण्याचा विचार करत आहात का?
 आम्ही सध्या Mahindra 575 DI वर खूप चांगली ऑफर देत आहोत.
 
 [थांबा, उत्तराची वाट पहा]
 
-PM-KISAN च्या पैशातून EMI सुरू करता येईल. 
+PM-KISAN च्या पैशातून EMI सुरू करता येईल.
 फक्त ₹5,000 बुकिंगमध्ये आजच आपले नाव नोंदवा.
 
 आपण कधी यायला जमेल - शनिवारी किंवा रविवारी?`,

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, Modal, Input, Select } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -91,7 +91,7 @@ export const UsedTractor: React.FC = () => {
   // ── Photos ───────────────────────────────────────────────
   const [photoModal, setPhotoModal] = useState<{ open: boolean; tractor?: any; photos: string[] }>({ open: false, photos: [] });
   const [photoUploading, setPhotoUploading] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+
 
   // ── Delete Confirm ───────────────────────────────────────
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; tractor?: any }>({ open: false });
@@ -539,25 +539,21 @@ export const UsedTractor: React.FC = () => {
                   </div>
                 ))}
                 {photoModal.photos.length < 4 && (
-                  <button
-                    onClick={() => photoInputRef.current?.click()}
-                    className="aspect-square rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center gap-1 hover:border-brand-400/50 transition-colors">
+                  <label htmlFor="photo-file-input" className="aspect-square rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center gap-1 hover:border-brand-400/50 transition-colors cursor-pointer">
                     <Plus size={18} className="text-[var(--text-muted)]" />
                     <span className="text-[10px] text-[var(--text-muted)]">Add</span>
-                  </button>
+                  </label>
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => photoInputRef.current?.click()}
-                className="w-full py-10 rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center gap-2 hover:border-brand-400/50 transition-colors">
+              <label htmlFor="photo-file-input" className="w-full py-10 rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center gap-2 hover:border-brand-400/50 transition-colors cursor-pointer">
                 <Upload size={28} className="text-[var(--text-muted)]" />
                 <p className="text-sm text-[var(--text-muted)]">Click to upload photos</p>
                 <p className="text-xs text-[var(--text-muted)]">JPG, PNG — up to 4 photos</p>
-              </button>
+              </label>
             )}
-            <input ref={photoInputRef} type="file" multiple accept="image/*" className="hidden"
-              onChange={e => handlePhotoFiles(e.target.files)} />
+            <input id="photo-file-input" type="file" multiple accept="image/*" className="hidden"
+              onChange={e => { handlePhotoFiles(e.target.files); e.target.value = ''; }} />
             <p className="text-xs text-[var(--text-muted)]">{4 - photoModal.photos.length} slot{4 - photoModal.photos.length !== 1 ? 's' : ''} remaining · Photos are compressed automatically</p>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setPhotoModal({ open: false, photos: [] })}>Cancel</Button>

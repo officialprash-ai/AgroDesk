@@ -178,7 +178,7 @@ export const useAppStore = create<AppStore>()(
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter(t => t.id !== id) })),
     }),
     {
-      name: 'agrodesk-auth',
+       name: 'agrodesk-auth',
       partialize: (s) => ({ token: s.token, dealer: s.dealer, dealerLogo: s.dealerLogo, theme: s.theme, knowledgeBase: s.knowledgeBase }),
     }
   )
