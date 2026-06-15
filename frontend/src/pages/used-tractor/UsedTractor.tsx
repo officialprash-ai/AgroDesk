@@ -8,7 +8,7 @@ import { formatCurrency, TRACTOR_MAKES } from '../../lib/utils';
 import {
   Truck, Plus, Sparkles, Phone, Camera, ArrowUpDown,
   AlertTriangle, CheckCircle, Clock, RefreshCw, Pencil,
-  Trash2, Copy, MessageSquare, X, Upload, ChevronRight,
+  Trash2, Copy, MessageSquare, X, Upload,
   Users, Star, Filter,
 } from 'lucide-react';
 
@@ -26,7 +26,7 @@ const STATUS_CYCLE: Record<string, string> = {
   sold: 'available',
 };
 
-const STATUS_VARIANTS: Record<string, 'active' | 'pending' | 'info' | 'error'> = {
+const STATUS_VARIANTS: Record<string, 'active' | 'pending' | 'info' | 'overdue'> = {
   available: 'active',
   reserved: 'pending',
   sold: 'info',

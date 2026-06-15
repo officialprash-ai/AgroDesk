@@ -116,7 +116,7 @@ export const ConversationTimeline: React.FC<Props> = ({ contactId, dealerId, com
         <div className="absolute left-[18px] top-0 bottom-0 w-px bg-[var(--border)]" />
 
         <div className="space-y-3">
-          {convs.map((c, i) => {
+          {convs.map((c) => {
             const color = CHANNEL_COLOR[c.channel] ?? '#888';
             const intent = c.intent ? INTENT_BADGE[c.intent] : null;
             const isOut = c.direction === 'outbound';

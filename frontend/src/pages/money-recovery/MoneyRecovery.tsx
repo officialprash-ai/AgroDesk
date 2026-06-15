@@ -8,7 +8,7 @@ import { formatCurrency, formatDate, formatRelative } from '../../lib/utils';
 import {
   IndianRupee, Phone, MessageSquare, Mail, AlertTriangle,
   CheckCircle, Clock, Sparkles, Play, Shield, Plus,
-  ChevronRight, X, TrendingUp, FileText, CheckSquare,
+  X, TrendingUp, FileText, CheckSquare,
   XCircle, ArrowRight,
 } from 'lucide-react';
 
