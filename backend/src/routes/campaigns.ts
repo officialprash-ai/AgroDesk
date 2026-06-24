@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 const CampaignSchema = z.object({
-  dealer_id: z.string(),
   name: z.string().min(1),
   goal: z.string().default(''),
   channels: z.array(z.string()).default(['voice']),
@@ -19,8 +19,8 @@ const CampaignSchema = z.object({
 // GET /api/campaigns
 router.get('/', async (req, res) => {
   try {
-    const { dealer_id, status } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { status } = req.query as Record<string, string>;
 
     const where: any = { dealer_id };
     if (status) where.status = status;
@@ -38,8 +38,9 @@ router.get('/', async (req, res) => {
 // GET /api/campaigns/:id
 router.get('/:id', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } });
-    if (!campaign) return res.status(404).json({ error: 'Not found' });
+    if (!campaign || campaign.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     res.json({ campaign });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch campaign' });
@@ -49,8 +50,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/campaigns
 router.post('/', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const data = CampaignSchema.parse(req.body);
-    const campaign = await prisma.campaign.create({ data });
+    const campaign = await prisma.campaign.create({ data: { ...data, dealer_id } });
     res.status(201).json({ campaign, success: true });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
@@ -61,6 +63,9 @@ router.post('/', async (req, res) => {
 // PATCH /api/campaigns/:id/status
 router.patch('/:id/status', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.campaign.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const { status } = z.object({ status: z.enum(['idle', 'running', 'paused', 'completed']) }).parse(req.body);
     const campaign = await prisma.campaign.update({
       where: { id: req.params.id },
@@ -76,6 +81,9 @@ router.patch('/:id/status', async (req, res) => {
 // PATCH /api/campaigns/:id/progress — internal: increment sent/responses/interested
 router.patch('/:id/progress', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.campaign.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const { sent = 0, responses = 0, interested = 0 } = req.body as Record<string, number>;
     const campaign = await prisma.campaign.update({
       where: { id: req.params.id },
@@ -95,6 +103,9 @@ router.patch('/:id/progress', async (req, res) => {
 // DELETE /api/campaigns/:id
 router.delete('/:id', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.campaign.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     await prisma.campaign.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {

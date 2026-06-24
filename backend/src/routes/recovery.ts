@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 const RecoverySchema = z.object({
-  dealer_id: z.string(),
   customer_name: z.string().min(1),
   phone: z.string().min(10),
   amount_due: z.number().int().positive(),
@@ -17,8 +17,8 @@ const RecoverySchema = z.object({
 
 router.get('/', async (req, res) => {
   try {
-    const { dealer_id, stage, status = 'active' } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { stage, status = 'active' } = req.query as Record<string, string>;
     const where: any = { dealer_id, status };
     if (stage) where.escalation_stage = stage;
     const cases = await prisma.recoveryCase.findMany({
@@ -34,8 +34,9 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const data = RecoverySchema.parse(req.body);
-    const recoveryCase = await prisma.recoveryCase.create({ data });
+    const recoveryCase = await prisma.recoveryCase.create({ data: { ...data, dealer_id } });
     res.status(201).json({ case: recoveryCase, success: true });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
@@ -45,6 +46,9 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.recoveryCase.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const UpdateSchema = z.object({
       escalation_stage: z.enum(['gentle', 'firm', 'stern', 'legal']).optional(),
       ptp_date: z.string().transform(s => new Date(s)).optional().nullable(),
@@ -87,8 +91,8 @@ router.post('/:id/contact', async (req, res) => {
 
 router.post('/bulk', async (req, res) => {
   try {
-    const { dealer_id, channels } = z.object({
-      dealer_id: z.string(),
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { channels } = z.object({
       channels: z.array(z.string()).default(['voice', 'whatsapp']),
     }).parse(req.body);
     const activeCases = await prisma.recoveryCase.findMany({

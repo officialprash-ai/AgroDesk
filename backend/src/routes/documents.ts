@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/documents?dealer_id=&period_month=YYYY-MM
+// GET /api/documents?period_month=YYYY-MM
 router.get('/', async (req, res) => {
   try {
-    const { dealer_id, period_month } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { period_month } = req.query as Record<string, string>;
 
     const where: any = { dealer_id };
     if (period_month) where.period_month = period_month;
@@ -23,11 +24,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/documents  (create doc record — used by frontend upload wizard)
+// POST /api/documents
 router.post('/', async (req, res) => {
   try {
-    const { dealer_id, category, period_month, filename, file_url } = z.object({
-      dealer_id: z.string(),
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { category, period_month, filename, file_url } = z.object({
       category: z.string(),
       period_month: z.string(),
       filename: z.string().optional(),
@@ -54,12 +55,12 @@ router.post('/', async (req, res) => {
 // POST /api/documents/upload (alias, kept for compatibility)
 router.post('/upload', async (req, res) => {
   try {
-    const { dealer_id, category, period_month, filename, file_url } = z.object({
-      dealer_id: z.string(),
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { category, period_month, filename, file_url } = z.object({
       category: z.string(),
-      period_month: z.string(), // "2024-01"
+      period_month: z.string(),
       filename: z.string().optional(),
-      file_url: z.string().optional(), // S3 URL after upload
+      file_url: z.string().optional(),
     }).parse(req.body);
 
     const doc = await prisma.document.create({
@@ -82,6 +83,9 @@ router.post('/upload', async (req, res) => {
 // PATCH /api/documents/:id/confirm
 router.patch('/:id/confirm', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.document.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const doc = await prisma.document.update({
       where: { id: req.params.id },
       data: { confirmed: true },
@@ -95,8 +99,8 @@ router.patch('/:id/confirm', async (req, res) => {
 // POST /api/documents/send-to-accountant
 router.post('/send-to-accountant', async (req, res) => {
   try {
-    const { dealer_id, accountant_id, period_month } = z.object({
-      dealer_id: z.string(),
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { accountant_id, period_month } = z.object({
       accountant_id: z.string(),
       period_month: z.string(),
     }).parse(req.body);
@@ -106,10 +110,8 @@ router.post('/send-to-accountant', async (req, res) => {
       prisma.document.findMany({ where: { dealer_id, period_month } }),
     ]);
 
-    if (!accountant) return res.status(404).json({ error: 'Accountant not found' });
+    if (!accountant || accountant.dealer_id !== dealer_id) return res.status(404).json({ error: 'Accountant not found' });
 
-    // TODO: send via WhatsApp BSP or email
-    // For now, create a job
     await prisma.agentJob.create({
       data: {
         dealer_id,
@@ -129,8 +131,8 @@ router.post('/send-to-accountant', async (req, res) => {
 // POST /api/documents/accountants
 router.post('/accountants', async (req, res) => {
   try {
-    const { dealer_id, name, phone, email, tally_enabled, is_default } = z.object({
-      dealer_id: z.string(),
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { name, phone, email, tally_enabled, is_default } = z.object({
       name: z.string(),
       phone: z.string(),
       email: z.string(),
@@ -138,7 +140,6 @@ router.post('/accountants', async (req, res) => {
       is_default: z.boolean().default(false),
     }).parse(req.body);
 
-    // If setting as default, clear existing default first
     if (is_default) {
       await prisma.accountant.updateMany({ where: { dealer_id }, data: { is_default: false } });
     }
@@ -153,11 +154,10 @@ router.post('/accountants', async (req, res) => {
   }
 });
 
-// GET /api/documents/accountants?dealer_id=
+// GET /api/documents/accountants
 router.get('/accountants', async (req, res) => {
   try {
-    const { dealer_id } = req.query as { dealer_id: string };
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const accountants = await prisma.accountant.findMany({ where: { dealer_id } });
     res.json({ accountants });
   } catch (err) {

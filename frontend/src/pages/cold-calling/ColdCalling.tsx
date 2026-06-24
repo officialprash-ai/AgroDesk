@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, ProgressBar, Modal, Select, Input } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -80,12 +81,17 @@ function exportCSV(calls: Call[]) {
 function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium"
+    <motion.div
+      initial={{ opacity: 0, x: 48, scale: 0.92 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 24, scale: 0.94 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium"
       style={{ background: type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: type === 'success' ? '#4ade80' : '#f87171', backdropFilter: 'blur(12px)' }}>
       {type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
       {msg}
       <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100"><X size={12} /></button>
-    </div>
+    </motion.div>
   );
 }
 
@@ -274,17 +280,24 @@ export const ColdCalling: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="Cold Calling Agent" subtitle="Module D · AI-powered bulk outreach & lead qualification" />
-      <div className="p-6 space-y-5 page-enter">
+      <div className="p-6 space-y-5">
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total Contacts" value={calls.length} icon={<Users size={16} />} accent="#60a5fa" />
-          <MetricCard label="Interested" value={interested.length} sub={calls.length ? `${Math.round(interested.length / calls.length * 100)}% rate` : '0%'} icon={<CheckCircle size={16} />} accent="#4ade80" />
-          <MetricCard label="Callbacks" value={calls.filter(c => c.status === 'callback').length} icon={<Clock size={16} />} accent="#fbbf24" />
-          <MetricCard label="Completed" value={`${completed}/${calls.length}`} icon={<Phone size={16} />} accent="#a78bfa" />
+          {([
+            { label: 'Total Contacts', value: calls.length, icon: <Users size={16} />, accent: '#60a5fa' },
+            { label: 'Interested', value: interested.length, sub: calls.length ? `${Math.round(interested.length / calls.length * 100)}% rate` : '0%', icon: <CheckCircle size={16} />, accent: '#4ade80' },
+            { label: 'Callbacks', value: calls.filter(c => c.status === 'callback').length, icon: <Clock size={16} />, accent: '#fbbf24' },
+            { label: 'Completed', value: `${completed}/${calls.length}`, icon: <Phone size={16} />, accent: '#a78bfa' },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         {/* Campaign Control */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.28 }}>
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -310,9 +323,17 @@ export const ColdCalling: React.FC = () => {
             <Button variant="ghost" icon={<Download size={13} />} onClick={() => exportCSV(calls)}>Export Results</Button>
           </div>
         </Card>
+        </motion.div>
 
         {/* Live Call Visualizer */}
+        <AnimatePresence>
         {running && currentCall && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: -6 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          >
           <Card className="bg-[rgba(74,222,128,0.04)] border-brand-400/20">
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
@@ -339,7 +360,9 @@ export const ColdCalling: React.FC = () => {
               </div>
             </div>
           </Card>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -373,11 +396,16 @@ export const ColdCalling: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(c => {
+                {filtered.map((c, idx) => {
                   const cfg = STATUS_CONFIG[c.status];
                   const Icon = cfg?.icon || Phone;
                   return (
-                    <tr key={c.id}>
+                    <motion.tr
+                      key={c.id}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(idx * 0.03, 0.25), duration: 0.2 }}
+                    >
                       <td>
                         <div>
                           <p className="font-medium text-sm text-[var(--text-primary)]">{c.name}</p>
@@ -442,7 +470,7 @@ export const ColdCalling: React.FC = () => {
                           )}
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>
@@ -556,21 +584,4 @@ export const ColdCalling: React.FC = () => {
         </Modal>
 
         {/* ── NEW CAMPAIGN MODAL ───────────────────────────── */}
-        <Modal open={newCampaignModal} onClose={() => setNewCampaignModal(false)} title="New Cold Call Campaign" size="sm">
-          <div className="space-y-4">
-            <Input label="Campaign Name" value={newCampaignForm.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCampaignForm(f => ({ ...f, name: e.target.value }))} />
-            <Input label="Goal / Description" placeholder="e.g. Kharif season tractor outreach" value={newCampaignForm.goal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCampaignForm(f => ({ ...f, goal: e.target.value }))} />
-            <Select label="Call Language" value={newCampaignForm.language} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewCampaignForm(f => ({ ...f, language: e.target.value }))}
-              options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))} />
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setNewCampaignModal(false)}>Cancel</Button>
-              <Button onClick={handleNewCampaign} disabled={newCampaignLoading}>{newCampaignLoading ? 'Creating...' : 'Create Campaign'}</Button>
-            </div>
-          </div>
-        </Modal>
-
-      </div>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-};
+        <Modal open={

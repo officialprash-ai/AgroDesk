@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info,
   Sun, Moon, CloudMoon, LayoutDashboard, Users, Megaphone, Truck,
@@ -157,10 +158,10 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur-xl">
         <div>
-          <h1 className="font-display font-semibold text-xl text-[var(--text-primary)]">{title}</h1>
-          {subtitle && <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
+          <h1 className="font-display font-semibold text-xl text-[var(--text-primary)] leading-tight">{title}</h1>
+          {subtitle && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-3">
@@ -213,8 +214,15 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
             </div>
 
             {/* Results dropdown */}
+            <AnimatePresence>
             {searchOpen && results.length > 0 && (
-              <div className="absolute top-full left-0 mt-2 w-72 rounded-2xl border border-[var(--border)] bg-[var(--bg-mid)] shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden z-50 py-1.5">
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="absolute top-full left-0 mt-2 w-72 rounded-2xl border border-[var(--border)] bg-[var(--bg-mid)] shadow-[var(--shadow-xl)] overflow-hidden z-50 py-1.5"
+              >
                 {/* Group by type */}
                 {(['route', 'contact', 'kb'] as const).map(type => {
                   const group = results.filter(r => r.type === type);
@@ -264,16 +272,24 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                     </span>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
             {/* No results state */}
+            <AnimatePresence>
             {searchOpen && query.trim() && results.length === 0 && (
-              <div className="absolute top-full left-0 mt-2 w-72 rounded-2xl border border-[var(--border)] bg-[var(--bg-mid)] shadow-[0_16px_48px_rgba(0,0,0,0.5)] z-50 px-4 py-6 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="absolute top-full left-0 mt-2 w-72 rounded-2xl border border-[var(--border)] bg-[var(--bg-mid)] shadow-[var(--shadow-xl)] z-50 px-4 py-6 text-center"
+              >
                 <Search size={20} className="mx-auto mb-2 text-[var(--text-muted)] opacity-40" />
                 <p className="text-xs text-[var(--text-muted)]">No results for "<span className="text-[var(--text-primary)]">{query}</span>"</p>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           {/* ── Language switcher ─────────────────────────────────────────── */}
@@ -284,8 +300,15 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
               <Globe size={13} />
               <span className="hidden sm:block">{LANGUAGES.find(l => l.code === lang)?.label}</span>
             </button>
+            <AnimatePresence>
             {showLangMenu && (
-              <div className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-[var(--border)] shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden z-50 py-1 max-h-72 overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-[var(--border)] shadow-[var(--shadow-lg)] overflow-hidden z-50 py-1 max-h-72 overflow-y-auto"
+              >
                 {LANGUAGES.map(l => (
                   <button key={l.code} onClick={() => { setLanguage(l.code); setShowLangMenu(false); }}
                     className={cn('w-full text-left px-3 py-2 text-xs hover:bg-[rgba(255,255,255,0.05)] transition-colors flex items-center justify-between',
@@ -293,8 +316,9 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                     <span>{l.label}</span><span className="text-[10px] text-[var(--text-muted)]">{l.english}</span>
                   </button>
                 ))}
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           {/* ── Voice (coming soon) ───────────────────────────────────────── */}
@@ -325,8 +349,15 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                 </span>
               )}
             </button>
+            <AnimatePresence>
             {showNotifs && (
-              <div className="absolute right-0 top-full mt-2 w-80 glass rounded-2xl border border-[var(--border)] shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden z-50">
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className="absolute right-0 top-full mt-2 w-80 glass rounded-2xl border border-[var(--border)] shadow-[var(--shadow-lg)] overflow-hidden z-50"
+              >
                 <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
                   <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
                   <button onClick={() => setShowNotifs(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={14} /></button>
@@ -349,35 +380,10 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                     ))}
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
 
           {/* ── Avatar ───────────────────────────────────────────────────── */}
-          <div className="w-8 h-8 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer">
-            <span className="text-xs font-bold text-brand-400">{initials}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Toast notifications */}
-      <div aria-live="polite" className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.slice(-3).map(n => (
-          <div key={n.id} className={cn(
-            'flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl glass pointer-events-auto border page-enter',
-            n.type === 'success' ? 'border-brand-400/30' : n.type === 'error' ? 'border-red-400/30' : 'border-blue-400/30',
-          )}>
-            {n.type === 'success' ? <CheckCircle size={14} className="text-brand-400" /> :
-             n.type === 'error' ? <AlertCircle size={14} className="text-red-400" /> :
-             <Info size={14} className="text-blue-400" />}
-            <div>
-              <p className="text-xs font-semibold text-[var(--text-primary)]">{n.title}</p>
-              <p className="text-xs text-[var(--text-muted)]">{n.message}</p>
-            </div>
-            <button aria-label="Dismiss" onClick={() => dismissToast(n.id)} className="ml-2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X size={12} /></button>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-};
+          <div className="w-8 h-8 rounded-full bg-brand-400/

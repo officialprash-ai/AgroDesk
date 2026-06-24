@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, MetricCard, Modal, Input, Select, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -31,12 +32,17 @@ function nextStage(current: string): string | null {
 function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error'; onClose: () => void }) {
   React.useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium"
+    <motion.div
+      initial={{ opacity: 0, x: 48, scale: 0.92 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 24, scale: 0.94 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium"
       style={{ background: type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', border: `1px solid ${type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`, color: type === 'success' ? '#4ade80' : '#f87171', backdropFilter: 'blur(12px)' }}>
       {type === 'success' ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
       {msg}
       <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100"><X size={12} /></button>
-    </div>
+    </motion.div>
   );
 }
 
@@ -240,23 +246,30 @@ export const MoneyRecovery: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="Money Recovery Agent" subtitle="Module C · Automated multi-channel payment recovery" />
-      <div className="p-6 space-y-5 page-enter">
+      <div className="p-6 space-y-5">
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total Pending" value={formatCurrency(totalDue)} sub={`${recoveryCases.length} cases`} icon={<IndianRupee size={16} />} accent="#fbbf24" />
-          <MetricCard label="Legal Stage" value={recoveryCases.filter((r: any) => r.escalation_stage === 'legal').length} sub="Need approval" icon={<Shield size={16} />} accent="#ef4444" />
-          <MetricCard label="PTPs Today" value={recoveryCases.filter((r: any) => r.ptp_date).length} sub="Promise to pay" icon={<Clock size={16} />} accent="#60a5fa" />
-          <MetricCard label="Resolved MTD" value="₹8.4L" sub="6 cases closed" icon={<CheckCircle size={16} />} accent="#4ade80" />
+          {([
+            { label: 'Total Pending', value: formatCurrency(totalDue), sub: `${recoveryCases.length} cases`, icon: <IndianRupee size={16} />, accent: '#fbbf24' },
+            { label: 'Legal Stage', value: recoveryCases.filter((r: any) => r.escalation_stage === 'legal').length, sub: 'Need approval', icon: <Shield size={16} />, accent: '#ef4444' },
+            { label: 'PTPs Today', value: recoveryCases.filter((r: any) => r.ptp_date).length, sub: 'Promise to pay', icon: <Clock size={16} />, accent: '#60a5fa' },
+            { label: 'Resolved MTD', value: '₹8.4L', sub: '6 cases closed', icon: <CheckCircle size={16} />, accent: '#4ade80' },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         {/* Escalation Pipeline */}
         <div className="grid grid-cols-4 gap-3">
-          {Object.entries(STAGE_CONFIG).map(([key, cfg]) => {
+          {Object.entries(STAGE_CONFIG).map(([key, cfg], i) => {
             const count = recoveryCases.filter((r: any) => r.escalation_stage === key).length;
             const amount = recoveryCases.filter((r: any) => r.escalation_stage === key).reduce((a: number, r: any) => a + r.amount_due, 0);
             return (
-              <Card key={key} className="text-center cursor-pointer" hover onClick={() => setTab(key)}>
+              <motion.div key={key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.06, duration: 0.26 }}>
+              <Card className="text-center cursor-pointer" hover onClick={() => setTab(key)}>
                 <div className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ background: cfg.bg }}>
                   <AlertTriangle size={18} style={{ color: cfg.color }} />
                 </div>
@@ -265,6 +278,7 @@ export const MoneyRecovery: React.FC = () => {
                 <p className="text-xl font-display font-bold" style={{ color: cfg.color }}>{count}</p>
                 <p className="text-xs text-[var(--text-secondary)]">{formatCurrency(amount)}</p>
               </Card>
+              </motion.div>
             );
           })}
         </div>
@@ -299,11 +313,18 @@ export const MoneyRecovery: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r: any) => {
+                {filtered.map((r: any, idx: number) => {
                   const cfg = STAGE_CONFIG[r.escalation_stage];
                   const isOverdue = new Date(r.due_date) < new Date();
                   return (
-                    <tr key={r.id} className="cursor-pointer" onClick={() => { setSelected(r); setPtpForm({ ptp_date: r.ptp_date ? r.ptp_date.split('T')[0] : '', ptp_amount: r.ptp_amount ? String(r.ptp_amount) : '' }); }}>
+                    <motion.tr
+                      key={r.id}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.22 }}
+                      className="cursor-pointer"
+                      onClick={() => { setSelected(r); setPtpForm({ ptp_date: r.ptp_date ? r.ptp_date.split('T')[0] : '', ptp_amount: r.ptp_amount ? String(r.ptp_amount) : '' }); }}
+                    >
                       <td>
                         <div>
                           <p className="font-semibold text-sm text-[var(--text-primary)]">{r.customer_name}</p>
@@ -348,7 +369,7 @@ export const MoneyRecovery: React.FC = () => {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>
@@ -519,32 +540,4 @@ export const MoneyRecovery: React.FC = () => {
             <div className="p-3 rounded-xl bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.2)]">
               <p className="text-xs text-red-400 flex items-center gap-2">
                 <Shield size={12} />
-                Legal stage cases are excluded — they require manual review and approval
-              </p>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Button>
-              <Button icon={<Play size={13} />} onClick={handleBulkRun} disabled={bulkLoading}>
-                {bulkLoading ? 'Queuing...' : 'Start Recovery Run'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-
-        {/* ── OUTCOME MODAL ────────────────────────────────── */}
-        {outcomeModal && (
-          <OutcomeModal
-            open={outcomeModal.open}
-            onClose={() => setOutcomeModal(null)}
-            onSave={saveOutcome}
-            channel={outcomeModal.channel}
-            caseName={outcomeModal.caseName}
-          />
-        )}
-
-      </div>
-
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
-  );
-};
+                Legal stage cases

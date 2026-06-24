@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 const TractorSchema = z.object({
-  dealer_id: z.string(),
   make: z.string().min(1),
   model: z.string().min(1),
   year: z.number().int().min(1990).max(new Date().getFullYear() + 1),
@@ -18,13 +18,10 @@ const TractorSchema = z.object({
 
 function calcUrgencyScore(days: number, hours: number, condition: string): number {
   let score = 0;
-  // Days on lot (max 50 pts)
   score += Math.min(50, Math.floor(days / 2));
-  // Hours (max 30 pts)
   if (hours > 4000) score += 30;
   else if (hours > 3000) score += 20;
   else if (hours > 2000) score += 10;
-  // Condition (max 20 pts)
   if (condition === 'poor') score += 20;
   else if (condition === 'fair') score += 10;
   return Math.min(99, score);
@@ -33,8 +30,8 @@ function calcUrgencyScore(days: number, hours: number, condition: string): numbe
 // GET /api/tractors
 router.get('/', async (req, res) => {
   try {
-    const { dealer_id, status } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { status } = req.query as Record<string, string>;
 
     const where: any = { dealer_id };
     if (status) where.status = status;
@@ -52,8 +49,9 @@ router.get('/', async (req, res) => {
 // GET /api/tractors/:id
 router.get('/:id', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const tractor = await prisma.usedTractor.findUnique({ where: { id: req.params.id } });
-    if (!tractor) return res.status(404).json({ error: 'Not found' });
+    if (!tractor || tractor.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     res.json({ tractor });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch tractor' });
@@ -63,10 +61,11 @@ router.get('/:id', async (req, res) => {
 // POST /api/tractors
 router.post('/', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const data = TractorSchema.parse(req.body);
     const urgency_score = calcUrgencyScore(0, data.hours, data.condition);
     const tractor = await prisma.usedTractor.create({
-      data: { ...data, urgency_score, days_on_lot: 0 },
+      data: { ...data, dealer_id, urgency_score, days_on_lot: 0 },
     });
     res.status(201).json({ tractor, success: true });
   } catch (err) {
@@ -78,10 +77,11 @@ router.post('/', async (req, res) => {
 // PATCH /api/tractors/:id
 router.patch('/:id', async (req, res) => {
   try {
-    const data = TractorSchema.partial().omit({ dealer_id: true }).parse(req.body);
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const existing = await prisma.usedTractor.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ error: 'Not found' });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
 
+    const data = TractorSchema.partial().parse(req.body);
     const urgency_score = calcUrgencyScore(
       existing.days_on_lot,
       data.hours ?? existing.hours,
@@ -102,6 +102,9 @@ router.patch('/:id', async (req, res) => {
 // PATCH /api/tractors/:id/status
 router.patch('/:id/status', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.usedTractor.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const { status } = z.object({
       status: z.enum(['available', 'reserved', 'sold']),
     }).parse(req.body);
@@ -119,6 +122,9 @@ router.patch('/:id/status', async (req, res) => {
 // PATCH /api/tractors/:id/description — save AI-generated listing description
 router.patch('/:id/description', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.usedTractor.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
     const { description } = z.object({ description: z.string() }).parse(req.body);
     const tractor = await prisma.usedTractor.update({
       where: { id: req.params.id },

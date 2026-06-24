@@ -1,6 +1,20 @@
+import * as Sentry from '@sentry/node';
+
+// Sentry MUST be initialised before any other imports touch the network/DB
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? 'development',
+    tracesSampleRate: 0.1,   // 10 % of requests — keep cost low
+    integrations: [Sentry.httpIntegration()],
+  });
+}
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma as _prisma } from './lib/prisma.js';
 const prisma = _prisma as any;
@@ -15,23 +29,130 @@ import authRouter from './routes/auth.js';
 import webhooksRouter from './routes/webhooks.js';
 import conversationsRouter from './routes/conversations.js';
 import { authMiddleware } from './middleware/auth.js';
+import type { AuthRequest } from './middleware/auth.js';
 import { demoGuard } from './middleware/demoGuard.js';
-import { resetDemoData, DEMO_PHONE, DEMO_PASSWORD } from './lib/demoSeed.js';
+import { resetDemoData } from './lib/demoSeed.js';
+import { enqueueJob } from './lib/queue.js';
+import { getAudio } from './lib/audioStore.js';
+import { buildExoML } from './lib/exotel.js';
+
+// ─── ENV VALIDATION (fail fast) ─────────────────────────────
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'ANTHROPIC_API_KEY'] as const;
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`FATAL: Missing required env vars: ${missing.join(', ')}. Refusing to start.`);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── MIDDLEWARE ──────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+    },
+  },
+}));
+
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://frontend-sepia-five-70.vercel.app',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ─── RATE LIMITING ───────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // max 20 login/register attempts per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later.' },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 10, // 10 AI calls per min per IP — protects Anthropic spend
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'AI rate limit reached, please wait a moment.' },
+});
+
+app.use(globalLimiter);
+
+// ─── WEBHOOK SIGNATURE VALIDATION ───────────────────────────
+/**
+ * Twilio signature validation middleware.
+ * Twilio signs every request with HMAC-SHA1 over (url + sorted params).
+ * Docs: https://www.twilio.com/docs/usage/security#validating-signatures
+ */
+function twilioWebhookAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    // If no token configured, skip validation (dev mode) but log a warning
+    console.warn('[webhook] TWILIO_AUTH_TOKEN not set — skipping signature validation');
+    return next();
+  }
+
+  const twilioSignature = req.headers['x-twilio-signature'] as string;
+  if (!twilioSignature) {
+    return res.status(403).json({ error: 'Missing Twilio signature' });
+  }
+
+  // Reconstruct the URL Twilio used
+  const proto = req.headers['x-forwarded-proto'] ?? req.protocol;
+  const url = `${proto}://${req.headers.host}${req.originalUrl}`;
+
+  // Build the string to sign: url + sorted POST params concatenated
+  const params: Record<string, string> = req.body ?? {};
+  const sortedKeys = Object.keys(params).sort();
+  const paramString = sortedKeys.map(k => `${k}${params[k]}`).join('');
+  const toSign = url + paramString;
+
+  const expectedSig = crypto
+    .createHmac('sha1', authToken)
+    .update(toSign, 'utf8')
+    .digest('base64');
+
+  if (!crypto.timingSafeEqual(Buffer.from(twilioSignature), Buffer.from(expectedSig))) {
+    return res.status(403).json({ error: 'Invalid Twilio signature' });
+  }
+
+  next();
+}
+
+/**
+ * Exotel webhook token validation.
+ * Exotel passes a configurable token as a query param: ?token=<EXOTEL_WEBHOOK_TOKEN>
+ */
+function exotelWebhookAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const expectedToken = process.env.EXOTEL_WEBHOOK_TOKEN;
+  if (!expectedToken) {
+    console.warn('[webhook/exotel] EXOTEL_WEBHOOK_TOKEN not set — skipping validation');
+    return next();
+  }
+  const providedToken = req.query.token as string;
+  if (!providedToken || providedToken !== expectedToken) {
+    return res.status(403).json({ error: 'Invalid webhook token' });
+  }
+  next();
+}
 
 // ─── HEALTH ─────────────────────────────────────────────────
 app.get('/api/health', async (_, res) => {
@@ -40,12 +161,10 @@ app.get('/api/health', async (_, res) => {
   res.json({ status: 'ok', service: 'AgroDesk API', version: '1.0.0', db, timestamp: new Date() });
 });
 
-// ─── AUTH (public) ──────────────────────────────────────────
-app.use('/api/auth', authRouter);
+// ─── AUTH (public, stricter rate limit) ─────────────────────
+app.use('/api/auth', authLimiter, authRouter);
 
 // ─── DOMAIN ROUTES (protected) ──────────────────────────────
-// demoGuard runs after auth: for demo accounts it simulates real-outbound
-// and destructive actions instead of executing them.
 app.use('/api/contacts', authMiddleware, demoGuard, contactsRouter);
 app.use('/api/campaigns', authMiddleware, demoGuard, campaignsRouter);
 app.use('/api/recovery', authMiddleware, demoGuard, recoveryRouter);
@@ -54,14 +173,13 @@ app.use('/api/dashboard', authMiddleware, demoGuard, dashboardRouter);
 app.use('/api/documents', authMiddleware, demoGuard, documentsRouter);
 app.use('/api/conversations', authMiddleware, conversationsRouter);
 
-// ─── TWILIO WEBHOOKS (public — Twilio calls these, no JWT) ───
-// Verify in prod with Twilio signature validation middleware
-app.use('/api/webhooks', webhooksRouter);
+// ─── WEBHOOKS (Twilio-signed, no JWT) ───────────────────────
+app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-app.post('/api/ai/script', authMiddleware, async (req, res) => {
+app.post('/api/ai/script', authMiddleware, aiLimiter, async (req, res) => {
   const { type, language, context } = req.body;
 
   const langNames: Record<string, string> = {
@@ -116,7 +234,7 @@ Return ONLY the script text, no explanation, no markdown.`;
 });
 
 // ─── AI — LISTING DESCRIPTION ───────────────────────────────
-app.post('/api/ai/listing', authMiddleware, async (req, res) => {
+app.post('/api/ai/listing', authMiddleware, aiLimiter, async (req, res) => {
   const { tractor } = req.body;
   const prompt = `Write a compelling used tractor listing description for an Indian tractor marketplace.
 
@@ -145,12 +263,11 @@ Requirements:
     });
     const description = message.content[0].type === 'text' ? message.content[0].text : '';
 
-    // Persist to DB if tractor_id provided
     if (tractor.id) {
       await prisma.usedTractor.update({
         where: { id: tractor.id },
         data: { ai_description: description, updated_at: new Date() },
-      }).catch(() => {}); // non-fatal
+      }).catch(() => {});
     }
 
     res.json({ description });
@@ -159,15 +276,15 @@ Requirements:
   }
 });
 
-// ─── AI — INBOUND SALESMAN (context-aware) ──────────────────
-app.post('/api/ai/respond', authMiddleware, async (req, res) => {
-  const { message, history, context, language, contact_id, dealer_id } = req.body;
+// ─── AI — INBOUND SALESMAN ───────────────────────────────────
+app.post('/api/ai/respond', authMiddleware, aiLimiter, async (req, res) => {
+  const dealer_id = (req as AuthRequest).dealer_id!;
+  const { message, history, context, language, contact_id } = req.body;
   const langNames: Record<string, string> = { mr: 'Marathi', hi: 'Hindi', en: 'English' };
   const langName = langNames[language || 'mr'] || 'Marathi';
 
-  // Fetch cross-channel history for this contact so the AI has full context
   let contactHistory = '';
-  if (contact_id && dealer_id) {
+  if (contact_id) {
     try {
       const pastConvs = await prisma.conversation.findMany({
         where: { contact_id, dealer_id },
@@ -191,7 +308,7 @@ Respond in ${langName}. Be helpful, warm, and knowledgeable about tractors and f
 Keep responses concise (2-4 sentences). Use Indian currency (₹).
 Never make up prices — say you'll check and confirm.
 Scope: tractor sales only. Escalate complex legal/financial questions to human agent.
-If the customer has interacted before (see history below), acknowledge continuity naturally — don't repeat what was already discussed.${contactHistory}`;
+If the customer has interacted before (see history below), acknowledge continuity naturally.${contactHistory}`;
 
   try {
     const messages = [
@@ -211,21 +328,12 @@ If the customer has interacted before (see history below), acknowledge continuit
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : '';
 
-    // Persist this exchange to conversations table
-    if (contact_id && dealer_id) {
+    if (contact_id) {
       await prisma.conversation.create({
-        data: {
-          dealer_id, contact_id,
-          channel: 'whatsapp', direction: 'inbound',
-          content: message, status: 'delivered',
-        },
+        data: { dealer_id, contact_id, channel: 'whatsapp', direction: 'inbound', content: message, status: 'delivered' },
       }).catch(() => {});
       await prisma.conversation.create({
-        data: {
-          dealer_id, contact_id,
-          channel: 'whatsapp', direction: 'outbound',
-          content: reply, status: 'sent',
-        },
+        data: { dealer_id, contact_id, channel: 'whatsapp', direction: 'outbound', content: reply, status: 'sent' },
       }).catch(() => {});
     }
 
@@ -235,39 +343,57 @@ If the customer has interacted before (see history below), acknowledge continuit
   }
 });
 
-// ─── AGENT JOBS ──────────────────────────────────────────────
-app.post('/api/jobs', async (req, res) => {
-  try {
-    const { dealer_id, agent_type, payload, scheduled_for } = req.body;
+// ─── AUDIO + EXOML (public — called by Exotel during a call) ─
+app.get('/api/audio/:id', (req, res) => {
+  const entry = getAudio(req.params.id);
+  if (!entry) return res.status(404).send('Audio not found or expired');
+  res.setHeader('Content-Type', entry.contentType);
+  res.setHeader('Content-Length', entry.buffer.length);
+  res.send(entry.buffer);
+});
 
-    // Demo accounts never queue real agent jobs (which would place calls /
-    // send messages). Return a simulated success so the UI flows normally.
-    if (dealer_id) {
-      const dealer = await prisma.dealer.findUnique({ where: { id: dealer_id }, select: { is_demo: true } });
-      if (dealer?.is_demo) {
-        return res.json({ success: true, demo: true, simulated: true, message: 'Demo mode: agent job simulated — no real calls or messages were sent.' });
-      }
-    }
+app.get('/api/exoml/:id', (req, res) => {
+  const audioUrl = `${(process.env.BACKEND_URL ?? '').replace(/\/$/, '')}/api/audio/${req.params.id}`;
+  res.setHeader('Content-Type', 'text/xml');
+  res.send(buildExoML(audioUrl));
+});
+
+// ─── AGENT JOBS (protected) ──────────────────────────────────
+app.post('/api/jobs', authMiddleware, demoGuard, async (req, res) => {
+  try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { agent_type, payload, scheduled_for } = req.body;
+
+    const scheduledAt = scheduled_for ? new Date(scheduled_for) : new Date();
 
     const job = await prisma.agentJob.create({
       data: {
         dealer_id,
         agent_type,
         payload: payload || {},
-        scheduled_for: scheduled_for ? new Date(scheduled_for) : new Date(),
+        scheduled_for: scheduledAt,
         idempotency_key: `job-${dealer_id}-${agent_type}-${Date.now()}`,
       },
     });
+
+    // Push to Bull queue — delay if scheduled in the future
+    const delayMs = Math.max(0, scheduledAt.getTime() - Date.now());
+    await enqueueJob(
+      { db_job_id: job.id, dealer_id, agent_type, payload: payload || {} },
+      delayMs,
+    ).catch(err => console.error('[jobs] Failed to enqueue job:', err));
+    // Non-fatal: job is in DB and will be picked up on worker restart
+
     res.json({ job, success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create job' });
   }
 });
 
-app.get('/api/jobs', async (req, res) => {
+app.get('/api/jobs', authMiddleware, async (req, res) => {
   try {
-    const { dealer_id, status, agent_type } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { status, agent_type } = req.query as Record<string, string>;
     const where: any = { dealer_id };
     if (status) where.status = status;
     if (agent_type) where.agent_type = agent_type;
@@ -282,10 +408,10 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-// ─── WEBHOOKS ────────────────────────────────────────────────
-app.post('/webhooks/exotel/call-status', async (req, res) => {
-  const { CallSid, Status, Direction, From, To, RecordingUrl } = req.body;
-  console.log('Exotel webhook:', { CallSid, Status, Direction, From, To });
+// ─── EXOTEL WEBHOOK (token-authenticated) ───────────────────
+app.post('/webhooks/exotel/call-status', exotelWebhookAuth, async (req, res) => {
+  const { CallSid, Status } = req.body;
+  console.log('Exotel webhook:', { CallSid, Status });
 
   try {
     const newStatus = Status === 'completed' ? 'completed' : Status === 'failed' ? 'failed' : 'pending';
@@ -298,3 +424,5 @@ app.post('/webhooks/exotel/call-status', async (req, res) => {
   }
   res.sendStatus(200);
 });
+
+// ─── GLOBAL ERROR HANDLER ────────────────

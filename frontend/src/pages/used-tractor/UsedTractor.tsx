@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, Modal, Input, Select } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -285,10 +286,16 @@ export const UsedTractor: React.FC = () => {
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total Inventory" value={usedTractors.length} icon={<Truck size={16} />} accent="#a78bfa" />
-          <MetricCard label="Sell Now (Critical)" value={critical} icon={<AlertTriangle size={16} />} accent="#ef4444" />
-          <MetricCard label="Avg Days on Lot" value={avgDays} icon={<Clock size={16} />} accent="#fbbf24" />
-          <MetricCard label="Total Inventory Value" value={formatCurrency(totalValue)} icon={<CheckCircle size={16} />} accent="#4ade80" />
+          {([
+            { label: 'Total Inventory', value: usedTractors.length, icon: <Truck size={16} />, accent: '#a78bfa' },
+            { label: 'Sell Now (Critical)', value: critical, icon: <AlertTriangle size={16} />, accent: '#ef4444' },
+            { label: 'Avg Days on Lot', value: avgDays, icon: <Clock size={16} />, accent: '#fbbf24' },
+            { label: 'Total Inventory Value', value: formatCurrency(totalValue), icon: <CheckCircle size={16} />, accent: '#4ade80' },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         {/* Priority Banner */}

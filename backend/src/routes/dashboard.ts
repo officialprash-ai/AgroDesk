@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/metrics', async (req, res) => {
   try {
-    const { dealer_id } = req.query as { dealer_id: string };
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

@@ -359,7 +359,7 @@ export const Settings: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="Settings" subtitle="Dealer profile, integrations & agent configuration" />
-      <div className="p-6 space-y-5 page-enter">
+      <div className="p-6 space-y-5 ">
 
         <TabBar tabs={[
           { id: 'profile', label: 'Profile' },

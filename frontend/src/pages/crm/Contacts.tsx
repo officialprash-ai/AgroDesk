@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, Avatar, SearchInput, TabBar, Modal, Input, Select } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -75,7 +76,7 @@ export const Contacts: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="CRM · Contacts" subtitle={`${contacts.length} contacts across Maharashtra`} />
-      <div className="p-6 space-y-4 page-enter">
+      <div className="p-6 space-y-4">
 
         {/* Stats Bar */}
         <div className="grid grid-cols-4 gap-3">
@@ -84,16 +85,28 @@ export const Contacts: React.FC = () => {
             { label: 'Qualified', value: contacts.filter(c => c.lead_status === 'qualified').length, color: '#4ade80' },
             { label: 'Opt-in WhatsApp', value: contacts.filter(c => c.opt_in_whatsapp).length, color: '#60a5fa' },
             { label: 'Won This Month', value: contacts.filter(c => c.lead_status === 'won').length, color: '#a78bfa' },
-          ].map(s => (
-            <Card key={s.label} className="border-l-[3px] py-3" style={{ borderLeftColor: s.color } as React.CSSProperties}>
-              <p className="text-xl font-display font-bold" style={{ color: s.color }}>{s.value}</p>
-              <p className="text-xs text-[var(--text-muted)]">{s.label}</p>
-            </Card>
+          ].map((s, i) => (
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Card className="border-l-[3px] py-3" style={{ borderLeftColor: s.color } as React.CSSProperties}>
+                <p className="text-xl font-display font-bold animate-number-pop" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-xs text-[var(--text-muted)]">{s.label}</p>
+              </Card>
+            </motion.div>
           ))}
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.26 }}
+          className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between"
+        >
           <TabBar tabs={tabs} active={stage} onChange={setStage} />
           <div className="flex gap-2">
             <SearchInput value={search} onChange={setSearch} placeholder="Search contacts..." />
@@ -101,9 +114,10 @@ export const Contacts: React.FC = () => {
             <Button variant="secondary" size="sm" icon={<Download size={13} />}>Export</Button>
             <Button size="sm" icon={<UserPlus size={13} />} onClick={() => setShowAdd(true)}>Add Contact</Button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Table */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24, duration: 0.28 }}>
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="ag-table">
@@ -134,8 +148,13 @@ export const Contacts: React.FC = () => {
                   <tr><td colSpan={8} className="text-center py-10 text-sm text-red-400">Couldn't load contacts — <button onClick={refetch} className="underline hover:text-red-300">retry</button></td></tr>
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={8} className="text-center py-12 text-sm text-[var(--text-muted)]">{contacts.length === 0 ? 'No contacts yet — add your first contact to get started.' : 'No contacts match your filters.'}</td></tr>
-                ) : filtered.map(c => (
-                  <tr key={c.id}>
+                ) : filtered.map((c, idx) => (
+                  <motion.tr
+                    key={c.id}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: Math.min(idx * 0.03, 0.3), duration: 0.22 }}
+                  >
                     <td>
                       <div className="flex items-center gap-3">
                         <Avatar name={c.name} size={34} />
@@ -186,7 +205,7 @@ export const Contacts: React.FC = () => {
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
@@ -195,6 +214,7 @@ export const Contacts: React.FC = () => {
             )}
           </div>
         </Card>
+        </motion.div>
 
         {/* Add Contact Modal */}
         <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New Contact">
@@ -219,19 +239,4 @@ export const Contacts: React.FC = () => {
                 <input type="checkbox" className="accent-brand-400" checked={form.opt_in_whatsapp} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_whatsapp: e.target.checked }))} /> WhatsApp opt-in
               </label>
               <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
-                <input type="checkbox" className="accent-brand-400" checked={form.opt_in_sms} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_sms: e.target.checked }))} /> SMS opt-in
-              </label>
-              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
-                <input type="checkbox" className="accent-brand-400" checked={form.opt_in_call} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_call: e.target.checked }))} /> Call opt-in
-              </label>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button onClick={handleSaveContact} disabled={addLoading}>{addLoading ? 'Saving...' : 'Save Contact'}</Button>
-            </div>
-          </div>
-        </Modal>
-      </div>
-    </div>
-  );
-};
+                <input type="checkbox" className="accent-brand-400" checked={fo

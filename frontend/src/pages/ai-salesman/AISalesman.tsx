@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -300,13 +301,19 @@ export const AISalesman: React.FC = () => {
         ))}
       </div>
 
-      <div className="p-6 space-y-5 page-enter">
+      <div className="p-6 space-y-5">
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Active Chats" value={active} icon={<MessageSquare size={16} />} accent="#4ade80" />
-          <MetricCard label="Resolved Today" value={resolved} icon={<CheckCircle size={16} />} accent="#60a5fa" />
-          <MetricCard label="Escalated" value={escalated} icon={<AlertTriangle size={16} />} accent="#fbbf24" />
-          <MetricCard label="Avg Response" value="< 10s" icon={<Zap size={16} />} accent="#a78bfa" />
+          {([
+            { label: 'Active Chats', value: active, icon: <MessageSquare size={16} />, accent: '#4ade80' },
+            { label: 'Resolved Today', value: resolved, icon: <CheckCircle size={16} />, accent: '#60a5fa' },
+            { label: 'Escalated', value: escalated, icon: <AlertTriangle size={16} />, accent: '#fbbf24' },
+            { label: 'Avg Response', value: '< 10s', icon: <Zap size={16} />, accent: '#a78bfa' },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         <TabBar tabs={[

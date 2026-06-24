@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, ProgressBar, EmptyState } from '../../components/ui';
@@ -182,14 +183,20 @@ export const SalesEngine: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="Sales Engine" subtitle="Module A · Automated outreach & campaign management" />
-      <div className="p-6 space-y-5 page-enter">
+      <div className="p-6 space-y-5">
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Active Campaigns" value={campaignsByStatus.running} icon={<Megaphone size={16} />} accent="#4ade80" trend={{ value: 12, label: 'vs last month' }} />
-          <MetricCard label="Messages Sent" value="1,284" sub="This month" icon={<Zap size={16} />} accent="#60a5fa" trend={{ value: 8, label: 'vs last month' }} />
-          <MetricCard label="Responses" value="312" sub="24.3% rate" icon={<Users size={16} />} accent="#fbbf24" trend={{ value: 3, label: 'vs last month' }} />
-          <MetricCard label="Interested Leads" value="87" sub="From campaigns" icon={<Target size={16} />} accent="#a78bfa" trend={{ value: 15, label: 'vs last month' }} />
+          {([
+            { label: 'Active Campaigns', value: campaignsByStatus.running, icon: <Megaphone size={16} />, accent: '#4ade80', trend: { value: 12, label: 'vs last month' } },
+            { label: 'Messages Sent', value: '1,284', sub: 'This month', icon: <Zap size={16} />, accent: '#60a5fa', trend: { value: 8, label: 'vs last month' } },
+            { label: 'Responses', value: '312', sub: '24.3% rate', icon: <Users size={16} />, accent: '#fbbf24', trend: { value: 3, label: 'vs last month' } },
+            { label: 'Interested Leads', value: '87', sub: 'From campaigns', icon: <Target size={16} />, accent: '#a78bfa', trend: { value: 15, label: 'vs last month' } },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         {/* Tab bar + actions */}
@@ -219,7 +226,7 @@ export const SalesEngine: React.FC = () => {
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {campaigns.map(c => {
+              {campaigns.map((c, idx) => {
                 const sent = Number(c.sent ?? 0);
                 const total = Number(c.total_contacts ?? 1);
                 const responses = Number(c.responses ?? 0);
@@ -228,7 +235,13 @@ export const SalesEngine: React.FC = () => {
                 const isRunning = c.status === 'running';
                 const loadingThis = actionLoading === String(c.id) + '_status';
                 return (
-                  <Card key={String(c.id)} className="space-y-4" hover>
+                  <motion.div
+                    key={String(c.id)}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.07, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                  <Card className="space-y-4 h-full" hover>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -281,6 +294,7 @@ export const SalesEngine: React.FC = () => {
                       <Button variant="ghost" size="sm" icon={<Wand2 size={12} />} onClick={() => openScript(c)}>Script</Button>
                     </div>
                   </Card>
+                  </motion.div>
                 );
               })}
             </div>
@@ -612,20 +626,4 @@ export const SalesEngine: React.FC = () => {
             <div className="flex gap-2 justify-between">
               <div className="flex gap-2">
                 {['Make formal', 'Add offer', 'Shorten'].map(action => (
-                  <button key={action} className="text-xs px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:border-brand-400/40 hover:text-brand-400 transition-all">
-                    {action}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowEdit(false)}>Cancel</Button>
-                <Button size="sm" icon={<Check size={12} />} onClick={() => setShowEdit(false)}>Save Changes</Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-    </div>
-  );
-};
+                  <butto

@@ -2,14 +2,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma as _prisma } from '../lib/prisma.js';
 const prisma = _prisma as any;
+import type { AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/conversations?contact_id=&dealer_id=&limit=
+// GET /api/conversations?contact_id=&limit=
 router.get('/', async (req, res) => {
   try {
-    const { contact_id, dealer_id, campaign_id, channel, limit = '50' } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { contact_id, campaign_id, channel, limit = '50' } = req.query as Record<string, string>;
 
     const where: Record<string, unknown> = { dealer_id };
     if (contact_id) where.contact_id = contact_id;
@@ -31,8 +32,7 @@ router.get('/', async (req, res) => {
 // GET /api/conversations/context/:contact_id — last 10 for AI context injection
 router.get('/context/:contact_id', async (req, res) => {
   try {
-    const { dealer_id } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const dealer_id = (req as AuthRequest).dealer_id!;
 
     const conversations = await prisma.conversation.findMany({
       where: { contact_id: req.params.contact_id, dealer_id },
@@ -40,7 +40,6 @@ router.get('/context/:contact_id', async (req, res) => {
       take: 10,
     });
 
-    // Build a human-readable summary for Claude
     const summary = conversations.reverse().map((c: any) => {
       const who = c.direction === 'inbound' ? 'Customer' : 'Agent';
       const when = new Date(c.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -55,7 +54,6 @@ router.get('/context/:contact_id', async (req, res) => {
 
 // POST /api/conversations — record an outbound message
 const ConvSchema = z.object({
-  dealer_id: z.string(),
   contact_id: z.string(),
   campaign_id: z.string().optional(),
   channel: z.enum(['whatsapp', 'voice', 'sms', 'email']),
@@ -69,10 +67,10 @@ const ConvSchema = z.object({
 
 router.post('/', async (req, res) => {
   try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const data = ConvSchema.parse(req.body);
-    const conv = await prisma.conversation.create({ data });
+    const conv = await prisma.conversation.create({ data: { ...data, dealer_id } });
 
-    // keep contact.last_contact fresh
     await prisma.contact.update({
       where: { id: data.contact_id },
       data: { last_contact: new Date() },
@@ -85,11 +83,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/conversations/stats/:dealer_id — aggregate for dashboard
-router.get('/stats/:dealer_id', async (req, res) => {
+// GET /api/conversations/stats — aggregate for dashboard (last 30 days)
+router.get('/stats', async (req, res) => {
   try {
-    const { dealer_id } = req.params;
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // last 30 days
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [total, byChannel, byIntent, byDay] = await Promise.all([
       prisma.conversation.count({ where: { dealer_id, created_at: { gte: since } } }),
@@ -103,7 +101,6 @@ router.get('/stats/:dealer_id', async (req, res) => {
         where: { dealer_id, direction: 'inbound', created_at: { gte: since } },
         _count: true,
       }),
-      // last 7 days count
       prisma.$queryRaw<{ day: string; count: bigint }[]>`
         SELECT DATE(created_at) as day, COUNT(*)::int as count
         FROM conversations

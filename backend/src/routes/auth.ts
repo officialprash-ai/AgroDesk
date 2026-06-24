@@ -8,7 +8,7 @@ const prisma = _prisma as any;
 import { resetDemoData } from '../lib/demoSeed.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET ?? 'agrodesk-dev-secret-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET!; // fails at boot if missing — see index.ts env check
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -23,9 +23,9 @@ router.post('/login', async (req, res) => {
     const dealer = await prisma.dealer.findFirst({ where: { phone } });
     if (!dealer) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const valid = dealer.password_hash === ''
-      ? true
-      : await bcrypt.compare(password, dealer.password_hash);
+    // Google-only accounts have an empty password_hash — they must use Google sign-in
+    if (!dealer.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, dealer.password_hash);
 
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 

@@ -25,7 +25,7 @@ export const Pipeline: React.FC = () => {
   return (
     <div className="flex-1 overflow-auto">
       <Header title="CRM · Pipeline" subtitle="Drag leads across stages · Maharashtra region" />
-      <div className="p-6 page-enter">
+      <div className="p-6 ">
         <div className="flex gap-4 overflow-x-auto pb-4">
           {STAGES.map(stage => {
             const stageContacts = contacts.filter(c => c.lead_status === stage.id);

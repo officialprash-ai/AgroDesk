@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'agrodesk-dev-secret-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET!; // fails at boot if missing — see index.ts env check
 
 export interface AuthRequest extends Request {
   dealer_id?: string;

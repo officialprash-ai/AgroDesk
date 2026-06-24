@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Card, Button, Badge, MetricCard, Modal, Input, TabBar } from '../../components/ui';
 import { useAppStore } from '../../store';
@@ -132,10 +133,16 @@ export const AIAccountant: React.FC = () => {
 
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Bills Uploaded" value={String(billsUploaded)} sub={CURRENT_PERIOD} icon={<FileText size={16} />} accent="#4ade80" />
-          <MetricCard label="Tally Synced" value={String(tallySynced)} sub={`of ${billsUploaded} bills`} icon={<CheckCircle size={16} />} accent="#60a5fa" />
-          <MetricCard label="Pending OCR" value={String(pendingOcr)} icon={<Clock size={16} />} accent="#fbbf24" />
-          <MetricCard label="Accountants" value={String(accountants.length)} icon={<Building size={16} />} accent="#a78bfa" />
+          {([
+            { label: 'Bills Uploaded', value: String(billsUploaded), sub: CURRENT_PERIOD, icon: <FileText size={16} />, accent: '#4ade80' },
+            { label: 'Tally Synced', value: String(tallySynced), sub: `of ${billsUploaded} bills`, icon: <CheckCircle size={16} />, accent: '#60a5fa' },
+            { label: 'Pending OCR', value: String(pendingOcr), icon: <Clock size={16} />, accent: '#fbbf24' },
+            { label: 'Accountants', value: String(accountants.length), icon: <Building size={16} />, accent: '#a78bfa' },
+          ] as any[]).map((m, i) => (
+            <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <MetricCard {...m} />
+            </motion.div>
+          ))}
         </div>
 
         {/* Banner */}
