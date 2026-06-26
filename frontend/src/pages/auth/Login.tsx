@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Tractor } from 'lucide-react';
 import AgroDeskoLogo from '../../components/ui/AgroDeskoLogo';
 import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../lib/api';
