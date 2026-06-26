@@ -36,7 +36,8 @@ const NAV: Array<
 ];
 
 export const Sidebar: React.FC = () => {
-  const { sidebarOpen, toggleSidebar, dealer, clearAuth, dealerLogo } = useAppStore();
+  const { sidebarOpen, toggleSidebar, dealer, clearAuth, dealerLogo, theme } = useAppStore();
+  const isDark = theme !== 'light';
   const location = useLocation();
 
   return (
@@ -61,7 +62,7 @@ export const Sidebar: React.FC = () => {
               transition={{ duration: 0.15 }}
               className="flex-shrink-0"
             >
-              <AgroDeskoLogo variant="full" height={36} />
+              <AgroDeskoLogo variant={isDark ? "full-dark" : "full"} height={36} />
             </motion.div>
           ) : (
             <motion.div
@@ -72,7 +73,7 @@ export const Sidebar: React.FC = () => {
               transition={{ duration: 0.15 }}
               className="flex-shrink-0"
             >
-              <LogoMark height={32} />
+              <LogoMark height={32} dark={isDark} />
             </motion.div>
           )}
         </AnimatePresence>
