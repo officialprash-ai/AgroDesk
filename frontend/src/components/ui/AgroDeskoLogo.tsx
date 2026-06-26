@@ -4,10 +4,10 @@ import React from 'react';
  * AgroDesk brand logo — all variants render the official brand SVG.
  *
  * Variants:
- *  - icon      : official tractor+chart mark for dark backgrounds (collapsed sidebar)
+ *  - icon      : official tractor+chart mark, dark=true for dark bg (collapsed sidebar)
  *  - full      : official full logo for light backgrounds (login mobile)
- *  - full-dark : official full logo, light-coloured version for dark backgrounds
- *                (sidebar expanded, login desktop dark panel)
+ *  - full-dark : official full logo, bright-coloured version for dark backgrounds
+ *                (sidebar expanded in dark/night mode, login desktop dark panel)
  */
 
 interface AgroDeskoLogoProps {
@@ -19,8 +19,8 @@ interface AgroDeskoLogoProps {
 
 /**
  * Tractor + chart mark only (no wordmark).
- * Pass dark=true (default) for dark sidebar backgrounds,
- * dark=false for light sidebar backgrounds.
+ * dark=true  → logo-mark-dark.svg (bright green+gold, for dark sidebar)
+ * dark=false → logo-mark.svg      (brand green+gold, for light sidebar)
  */
 export const LogoMark: React.FC<{ height?: number; dark?: boolean; className?: string }> = ({
   height = 40,
@@ -36,7 +36,7 @@ export const LogoMark: React.FC<{ height?: number; dark?: boolean; className?: s
   />
 );
 
-/** Full horizontal logo — official brand SVG, light or dark variant */
+/** Full horizontal logo — official brand SVG, light or dark colour variant */
 const AgroDeskoLogo: React.FC<AgroDeskoLogoProps> = ({
   variant = 'full',
   height = 40,
@@ -47,7 +47,7 @@ const AgroDeskoLogo: React.FC<AgroDeskoLogoProps> = ({
   }
 
   if (variant === 'full-dark') {
-    /* Official SVG with bright green + gold + white paths — visible on dark bg */
+    /* logo-dark.svg: bright green tractor + gold curve + white "Desk" — for dark bg */
     return (
       <img
         src="/logo-dark.svg"
@@ -59,10 +59,16 @@ const AgroDeskoLogo: React.FC<AgroDeskoLogoProps> = ({
     );
   }
 
-  /* variant="full" — official brand SVG for light backgrounds */
+  /* variant="full" — logo.svg: brand colours, for light backgrounds */
   return (
     <img
       src="/logo.svg"
       alt="AgroDesk"
       height={height}
       style={{ display: 'block', width: 'auto', height }}
+      className={className}
+    />
+  );
+};
+
+export default AgroDeskoLogo;
