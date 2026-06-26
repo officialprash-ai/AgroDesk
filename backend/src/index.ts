@@ -65,7 +65,18 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
-app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
+// Allow any *.vercel.app subdomain (covers preview + prod deployments)
+const VERCEL_RE = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || VERCEL_RE.test(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`CORS: ${origin} not allowed`));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -425,4 +436,19 @@ app.post('/webhooks/exotel/call-status', exotelWebhookAuth, async (req, res) => 
   res.sendStatus(200);
 });
 
-// ─── GLOBAL ERROR HANDLER ────────────────
+// ─── GLOBAL ERROR HANDLER ────────────────────────────────────
+// Sentry must capture the error before we send a response
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
+
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[unhandled error]', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+app.listen(PORT, () => {
+  console.log(`AgroDesk API running on port ${PORT}`);
+});
+
+export default app;
