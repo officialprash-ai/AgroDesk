@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+// In dev: set VITE_API_URL=http://localhost:3001 in frontend/.env
+// In prod: leave unset — Vercel rewrites /api/* to Railway (see root vercel.json)
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 function getToken(): string | null {
   try {
