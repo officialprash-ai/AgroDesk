@@ -12,6 +12,11 @@ export const agentQueue = new Bull('agrodesk:agent-jobs', REDIS_URL, {
   },
 });
 
+// Prevent Redis errors from crashing the process
+agentQueue.on('error', (err) => {
+  console.error('[queue] Redis error (non-fatal):', err.message);
+});
+
 export interface QueueJobData {
   db_job_id: string;   // AgentJob.id in Postgres — worker updates status here
   dealer_id: string;
