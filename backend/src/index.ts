@@ -397,6 +397,7 @@ app.post('/api/jobs', authMiddleware, demoGuard, async (req, res) => {
 
     res.json({ job, success: true });
   } catch (err) {
+    console.error('[jobs/create] error:', err);
     res.status(500).json({ error: 'Failed to create job' });
   }
 });
