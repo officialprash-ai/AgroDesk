@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Tractor, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import AgroDeskoLogo from '../../components/ui/AgroDeskoLogo';
 import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../lib/api';
 import { useAppStore } from '../../store';
@@ -256,15 +257,7 @@ export const Login: React.FC = () => {
 
         {/* Logo */}
         <div className="relative z-10 p-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-400 flex items-center justify-center text-xl font-display font-black text-surface-900">
-              A
-            </div>
-            <div>
-              <p className="text-lg font-display font-black text-white leading-none">AgroDesk</p>
-              <p className="text-[11px] text-brand-400 font-medium">AI-Powered Dealership</p>
-            </div>
-          </div>
+          <AgroDeskoLogo variant="full-dark" height={44} />
         </div>
 
         {/* Characters stage */}
@@ -414,12 +407,8 @@ export const Login: React.FC = () => {
 
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-brand-400 flex items-center justify-center text-xl font-display font-black text-surface-900">A</div>
-              <div className="text-left">
-                <p className="text-xl font-display font-black text-[var(--text-primary)]">AgroDesk</p>
-                <p className="text-[11px] text-brand-400">AI-Powered Dealership</p>
-              </div>
+            <div className="inline-flex items-center justify-center mb-3">
+              <AgroDeskoLogo variant="full" height={40} />
             </div>
             <p className="text-sm text-[var(--text-muted)]">Maharashtra's smartest dealer platform</p>
           </div>

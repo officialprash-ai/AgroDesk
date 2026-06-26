@@ -6,9 +6,10 @@ import { useAppStore } from '../../store';
 import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
-  Tractor, Zap, BarChart2, LogOut, HelpCircle,
+  Zap, BarChart2, LogOut, HelpCircle,
   TrendingUp, Tag, Clock, Mic, Sparkles, Calculator,
 } from 'lucide-react';
+import AgroDeskoLogo, { LogoMark } from '../ui/AgroDeskoLogo';
 
 type LucideIcon = React.ComponentType<{ size?: number; className?: string }>;
 
@@ -47,27 +48,31 @@ export const Sidebar: React.FC = () => {
     >
       {/* Logo */}
       <div className={cn(
-        'flex items-center gap-3 px-4 py-5 border-b border-[var(--border)]',
+        'flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]',
         !sidebarOpen && 'justify-center',
       )}>
-        <div className="relative flex-shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-brand-400 flex items-center justify-center shadow-[0_0_18px_rgba(74,222,128,0.38)]">
-            <Tractor size={15} className="text-surface-900" />
-          </div>
-          <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-brand-400 animate-pulse-slow border border-[var(--sidebar-bg)]" />
-        </div>
-        <AnimatePresence>
-          {sidebarOpen && (
+        <AnimatePresence mode="wait" initial={false}>
+          {sidebarOpen ? (
             <motion.div
+              key="full"
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
               transition={{ duration: 0.15 }}
+              className="flex-shrink-0"
             >
-              <h1 className="font-display font-bold text-base text-[var(--text-primary)] leading-none whitespace-nowrap">
-                AgroDesk
-              </h1>
-              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 font-mono">Dealer Intelligence</p>
+              <AgroDeskoLogo variant="full" height={36} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="icon"
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.15 }}
+              className="flex-shrink-0"
+            >
+              <LogoMark height={32} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -204,4 +209,47 @@ export const Sidebar: React.FC = () => {
               <line x1="16" y1="64" x2="72" y2="64" stroke="currentColor" strokeWidth="1.2"/>
               <line x1="24" y1="44" x2="64" y2="84" stroke="currentColor" strokeWidth="1.2"/>
               <line x1="64" y1="44" x2="24" y2="84" stroke="currentColor" strokeWidth="1.2"/>
-              <circle cx="122" cy="72" r="19"
+              <circle cx="122" cy="72" r="19" stroke="currentColor" strokeWidth="2.5"/>
+              <circle cx="122" cy="72" r="11" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3"/>
+              <circle cx="122" cy="72" r="3" fill="currentColor"/>
+              <rect x="44" y="54" width="80" height="9" rx="3" fill="currentColor" opacity="0.5"/>
+              <rect x="50" y="24" width="34" height="34" rx="4" fill="currentColor" opacity="0.3"/>
+              <rect x="50" y="24" width="34" height="34" rx="4" stroke="currentColor" strokeWidth="2"/>
+              <rect x="55" y="28" width="24" height="16" rx="2" fill="currentColor" opacity="0.45"/>
+              <rect x="82" y="30" width="30" height="24" rx="3" fill="currentColor" opacity="0.45"/>
+              <rect x="108" y="18" width="5" height="17" rx="2.5" fill="currentColor" opacity="0.7"/>
+              <circle cx="113" cy="38" r="5" fill="currentColor" opacity="0.6"/>
+              <path d="M18 92 Q81 98 148 92" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/>
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Collapse + Logout */}
+      <div className="p-3 border-t border-[var(--border)] space-y-1">
+        <motion.button
+          whileHover={{ x: sidebarOpen ? -2 : 2 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          onClick={toggleSidebar}
+          className={cn(
+            'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors',
+            !sidebarOpen && 'justify-center',
+          )}
+        >
+          {sidebarOpen ? <><ChevronLeft size={14} /><span>Collapse</span></> : <ChevronRight size={14} />}
+        </motion.button>
+        <motion.button
+          whileHover={{ x: 1 }}
+          onClick={clearAuth}
+          className={cn(
+            'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-muted)] hover:text-red-400 hover:bg-[rgba(239,68,68,0.06)] transition-colors',
+            !sidebarOpen && 'justify-center',
+          )}
+        >
+          <LogOut size={14} />
+          {sidebarOpen && <span>Sign Out</span>}
+        </motion.button>
+      </div>
+    </motion.aside>
+  );
+};
