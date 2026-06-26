@@ -165,7 +165,11 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    setTimeout(() => panelRef.current?.focus(), 50);
+    // Focus first focusable input inside modal, not the panel div itself
+    setTimeout(() => {
+      const first = panelRef.current?.querySelector<HTMLElement>('input, textarea, select, button');
+      first?.focus();
+    }, 80);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
@@ -182,7 +186,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
           onClick={onClose}
         >
           <motion.div
-            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/65 backdrop-blur-sm pointer-events-none"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -190,7 +194,6 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, si
           />
           <motion.div
             ref={panelRef}
-            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={title}
@@ -250,4 +253,178 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       style={{ background: `${accent}0d`, transform: 'translate(30%, -30%)' }}
     />
 
-    <div className="flex items-start 
+    <div className="flex items-start justify-between relative">
+      <div className="flex-1 min-w-0">
+        <p className="text-[10.5px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 truncate">
+          {label}
+        </p>
+        <motion.p
+          key={String(value)}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+          className="font-display font-bold text-[1.6rem] leading-none text-[var(--text-primary)] tabular-nums"
+        >
+          {value}
+        </motion.p>
+        {sub && <p className="text-xs text-[var(--text-secondary)] mt-1.5">{sub}</p>}
+        {trend && (
+          <div className={cn('flex items-center gap-1 mt-2 text-xs font-semibold', trend.value >= 0 ? 'text-brand-400' : 'text-red-400')}>
+            {trend.value >= 0
+              ? <TrendingUp size={11} />
+              : <TrendingDown size={11} />}
+            <span>{Math.abs(trend.value)}% {trend.label}</span>
+          </div>
+        )}
+      </div>
+      <div
+        className="p-2.5 rounded-xl flex-shrink-0 ml-3"
+        style={{ background: `${accent}18` }}
+      >
+        <div style={{ color: accent }}>{icon}</div>
+      </div>
+    </div>
+  </motion.div>
+);
+
+// ─── EMPTY STATE ──────────────────────────────────────────────────────────────
+export const EmptyState: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  message: string;
+  action?: React.ReactNode;
+}> = ({ icon, title, message, action }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.1 }}
+    className="flex flex-col items-center justify-center py-16 text-center"
+  >
+    <div className="p-4 rounded-2xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)] mb-4 text-[var(--text-muted)]">
+      {icon}
+    </div>
+    <h3 className="font-display font-semibold text-lg text-[var(--text-primary)] mb-2">{title}</h3>
+    <p className="text-[var(--text-secondary)] text-sm max-w-xs mb-4 leading-relaxed">{message}</p>
+    {action}
+  </motion.div>
+);
+
+// ─── PROGRESS BAR ─────────────────────────────────────────────────────────────
+export const ProgressBar: React.FC<{
+  value: number;
+  max: number;
+  color?: string;
+  label?: string;
+}> = ({ value, max, color = '#4ade80', label }) => {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div>
+      {label && (
+        <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1.5">
+          <span>{label}</span>
+          <span className="tabular-nums font-medium">{Math.round(pct)}%</span>
+        </div>
+      )}
+      <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          style={{ background: `linear-gradient(90deg, ${color}99, ${color})` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─── AVATAR ───────────────────────────────────────────────────────────────────
+export const Avatar: React.FC<{ name: string; size?: number }> = ({ name, size = 36 }) => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const colors = ['#4ade80', '#60a5fa', '#fbbf24', '#a78bfa', '#f87171', '#34d399'];
+  const color = colors[name.charCodeAt(0) % colors.length];
+  return (
+    <div
+      className="rounded-full flex items-center justify-center font-display font-bold flex-shrink-0"
+      style={{
+        width: size, height: size,
+        background: `${color}1e`,
+        color,
+        fontSize: size * 0.36,
+        border: `1.5px solid ${color}38`,
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
+
+// ─── TAB BAR ──────────────────────────────────────────────────────────────────
+interface TabBarProps {
+  tabs: { id: string; label: string; icon?: React.ReactNode; count?: number }[];
+  active: string;
+  onChange: (id: string) => void;
+  layoutId?: string;
+}
+export const TabBar: React.FC<TabBarProps> = ({ tabs, active, onChange, layoutId = 'tabbar' }) => (
+  <div className="flex gap-0.5 p-1 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--border)]">
+    <LayoutGroup id={layoutId}>
+      {tabs.map(tab => (
+        <button
+          key={tab.id}
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            'relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-150',
+            active === tab.id
+              ? 'text-surface-900'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]',
+          )}
+        >
+          {active === tab.id && (
+            <motion.div
+              layoutId={`${layoutId}-pill`}
+              className="absolute inset-0 bg-brand-400 rounded-lg"
+              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+            />
+          )}
+          <span className="relative z-10 flex items-center gap-1.5">
+            {tab.icon}
+            {tab.label}
+            {tab.count !== undefined && (
+              <span className={cn(
+                'text-xs px-1.5 py-0.5 rounded-full tabular-nums',
+                active === tab.id ? 'bg-[rgba(2,12,7,0.25)]' : 'bg-[rgba(255,255,255,0.08)]',
+              )}>
+                {tab.count}
+              </span>
+            )}
+          </span>
+        </button>
+      ))}
+    </LayoutGroup>
+  </div>
+);
+
+// ─── SEARCH INPUT ─────────────────────────────────────────────────────────────
+export const SearchInput: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}> = ({ value, onChange, placeholder = 'Search...' }) => (
+  <div className="relative">
+    <svg
+      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none"
+      width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
+    </svg>
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="ag-input pl-8 text-sm py-2"
+    />
+  </div>
+);

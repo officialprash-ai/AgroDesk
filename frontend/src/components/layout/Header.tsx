@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info,
-  Sun, Moon, CloudMoon, LayoutDashboard, Users, Megaphone, Truck,
+  Sun, Moon, LayoutDashboard, Users, Megaphone, Truck,
   IndianRupee, Phone, Bot, FileText, Settings, HelpCircle,
   BarChart2, Zap, BookOpen, ArrowRight,
 } from 'lucide-react';
@@ -45,13 +45,11 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
 
   // ── theme ──────────────────────────────────────────────────────────────────
   const THEMES = [
-    { key: 'dark'  as const, icon: <Moon size={13} />,      label: 'Dark' },
-    { key: 'light' as const, icon: <Sun size={13} />,        label: 'Light' },
-    { key: 'night' as const, icon: <CloudMoon size={13} />,  label: 'Night' },
+    { key: 'dark'  as const, icon: <Moon size={13} />,  label: 'Dark' },
+    { key: 'light' as const, icon: <Sun size={13} />,   label: 'Light' },
   ];
   const nextTheme = () => {
-    const order = ['dark', 'light', 'night'] as const;
-    setTheme(order[(order.indexOf(theme ?? 'dark') + 1) % 3]);
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
   const currentTheme = THEMES.find(t => t.key === (theme ?? 'dark')) ?? THEMES[0];
 
@@ -386,4 +384,42 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
           </div>
 
           {/* ── Avatar ───────────────────────────────────────────────────── */}
-          <div className="w-8 h-8 rounded-full bg-brand-400/
+          <div className="w-8 h-8 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer">
+            <span className="text-xs font-bold text-brand-400">{initials}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Toast notifications */}
+      <div aria-live="polite" className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        <AnimatePresence mode="popLayout">
+          {toasts.slice(-3).map(n => (
+            <motion.div
+              key={n.id}
+              layout
+              initial={{ opacity: 0, x: 48, scale: 0.92 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 24, scale: 0.94 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              className={cn(
+                'flex items-center gap-3 px-4 py-3 rounded-xl shadow-[var(--shadow-lg)] glass pointer-events-auto border',
+                n.type === 'success' ? 'border-brand-400/30' : n.type === 'error' ? 'border-red-400/30' : 'border-blue-400/30',
+              )}
+            >
+              {n.type === 'success' ? <CheckCircle size={14} className="text-brand-400 flex-shrink-0" /> :
+               n.type === 'error' ? <AlertCircle size={14} className="text-red-400 flex-shrink-0" /> :
+               <Info size={14} className="text-blue-400 flex-shrink-0" />}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{n.title}</p>
+                <p className="text-xs text-[var(--text-muted)] truncate">{n.message}</p>
+              </div>
+              <button aria-label="Dismiss" onClick={() => dismissToast(n.id)} className="ml-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] flex-shrink-0 transition-colors">
+                <X size={12} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </>
+  );
+};
