@@ -20,9 +20,15 @@ const LANG_MAP: Record<string, string> = {
 
 // Best speaker per language (Sarvam's available voices)
 const SPEAKER_MAP: Record<string, string> = {
-  'mr-IN': 'meera',
-  'hi-IN': 'meera',
-  'en-IN': 'meera',
+  'mr-IN': 'anushka',
+  'hi-IN': 'anushka',
+  'en-IN': 'anushka',
+  'gu-IN': 'anushka',
+  'pa-IN': 'anushka',
+  'ta-IN': 'anushka',
+  'te-IN': 'anushka',
+  'kn-IN': 'anushka',
+  'bn-IN': 'anushka',
 };
 
 export async function textToSpeech(text: string, language = 'mr'): Promise<Buffer> {
@@ -51,7 +57,7 @@ export async function textToSpeech(text: string, language = 'mr'): Promise<Buffe
         loudness: 1.5,
         speech_sample_rate: 8000,  // 8kHz telephony quality
         enable_preprocessing: true,
-        model: 'bulbul:v1',
+        model: 'bulbul:v2',
       }),
     });
 
