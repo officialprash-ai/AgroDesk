@@ -127,6 +127,3 @@ export const api = {
       req<{ jobs: any[]; total: number }>(`/api/jobs?dealer_id=${dealer_id}`),
   },
 };
-ler_id=${dealer_id}`),
-  },
-};
