@@ -239,4 +239,19 @@ export const Contacts: React.FC = () => {
                 <input type="checkbox" className="accent-brand-400" checked={form.opt_in_whatsapp} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_whatsapp: e.target.checked }))} /> WhatsApp opt-in
               </label>
               <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
-                <input type="checkbox" className="accent-brand-400" checked={fo
+                <input type="checkbox" className="accent-brand-400" checked={form.opt_in_sms} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_sms: e.target.checked }))} /> SMS opt-in
+              </label>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                <input type="checkbox" className="accent-brand-400" checked={form.opt_in_call} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_call: e.target.checked }))} /> Call opt-in
+              </label>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button onClick={handleSaveContact} disabled={addLoading}>{addLoading ? 'Saving...' : 'Save Contact'}</Button>
+            </div>
+          </div>
+        </Modal>
+      </div>
+    </div>
+  );
+};

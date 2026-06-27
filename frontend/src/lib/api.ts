@@ -118,4 +118,11 @@ export const api = {
     stats: (dealer_id: string) =>
       req<{ total: number; byChannel: Record<string, number>; byIntent: Record<string, number>; byDay: { day: string; count: number }[] }>(`/api/conversations/stats/${dealer_id}`),
   },
+
+  jobs: {
+    create: (data: { agent_type: string; payload: Record<string, unknown>; dealer_id: string }) =>
+      req<{ job: any; success: boolean }>('/api/jobs', { method: 'POST', body: JSON.stringify(data) }),
+    list: (dealer_id: string) =>
+      req<{ jobs: any[]; total: number }>(`/api/jobs?dealer_id=${dealer_id}`),
+  },
 };

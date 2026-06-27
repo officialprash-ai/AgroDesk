@@ -540,4 +540,32 @@ export const MoneyRecovery: React.FC = () => {
             <div className="p-3 rounded-xl bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.2)]">
               <p className="text-xs text-red-400 flex items-center gap-2">
                 <Shield size={12} />
-                Legal stage cases
+                Legal stage cases are excluded — they require manual review and approval
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Button>
+              <Button icon={<Play size={13} />} onClick={handleBulkRun} disabled={bulkLoading}>
+                {bulkLoading ? 'Queuing...' : 'Start Recovery Run'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ── OUTCOME MODAL ────────────────────────────────── */}
+        {outcomeModal && (
+          <OutcomeModal
+            open={outcomeModal.open}
+            onClose={() => setOutcomeModal(null)}
+            onSave={saveOutcome}
+            channel={outcomeModal.channel}
+            caseName={outcomeModal.caseName}
+          />
+        )}
+
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+};

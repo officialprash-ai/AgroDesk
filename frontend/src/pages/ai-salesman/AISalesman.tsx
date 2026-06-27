@@ -61,36 +61,22 @@ interface Conv {
   lang: string;
 }
 
-const INITIAL_CONVERSATIONS: Conv[] = [
-  { id: 1, name: 'Dinesh Jadhav', channel: 'whatsapp', lastMsg: 'John Deere 5310 ची किंमत काय आहे?', time: '2m ago', status: 'active', unread: 2, lang: 'mr' },
-  { id: 2, name: 'Suresh Kumar', channel: 'whatsapp', lastMsg: 'Can I get EMI details for 575 DI?', time: '15m ago', status: 'escalated', unread: 0, lang: 'hi' },
-  { id: 3, name: 'Web Enquiry #4821', channel: 'web', lastMsg: 'Interested in Kubota tractor range', time: '1h ago', status: 'resolved', unread: 0, lang: 'en' },
-  { id: 4, name: 'Ramesh Patil', channel: 'whatsapp', lastMsg: 'शोरूम कधी उघडते?', time: '2h ago', status: 'resolved', unread: 0, lang: 'mr' },
-];
+function relativeTime(iso: string): string {
+  try {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  } catch { return '—'; }
+}
 
-const INITIAL_CHAT_MAP: Record<number, ChatMessage[]> = {
-  1: [
-    { role: 'customer', text: 'नमस्कार, John Deere 5310 ची किंमत सांगा', time: '10:30' },
-    { role: 'ai', text: 'नमस्कार! John Deere 5310 ची सध्याची किंमत ₹8.5L पासून सुरू होते.\n\nआपल्या बजेटनुसार EMI ₹18,500/महिना (48 महिने) मिळू शकते.\n\nआपण आमच्या शोरूमला भेट द्यायला येणार का? मी आपल्यासाठी test drive बुक करतो.', time: '10:30' },
-    { role: 'customer', text: 'EMI साठी काय documents लागतात?', time: '10:31' },
-    { role: 'ai', text: 'John Deere Finance साठी लागणारे documents:\n\n📄 Aadhaar Card\n📄 PAN Card\n🌾 7/12 उतारा (जमीन)\n💰 Bank Statement (6 months)\n\nसर्व documents एकत्र असल्यास 3 दिवसात approval मिळते!\n\nआपण कधी येऊ शकता - या शनिवारी किंवा रविवारी?', time: '10:31' },
-  ],
-  2: [
-    { role: 'customer', text: 'Hi, I need EMI details for Mahindra 575 DI', time: '09:45' },
-    { role: 'ai', text: 'Hello! For Mahindra 575 DI:\n\n💰 Price: ₹6.8L – ₹7.2L (ex-showroom)\n📅 EMI Options:\n• 36 months: ₹21,500/month\n• 48 months: ₹17,200/month\n• 60 months: ₹14,800/month\n\nDown payment starts at just 10%. Shall I schedule a visit for you?', time: '09:45' },
-    { role: 'system', text: '⚠ Escalated to human agent — complex financing query', time: '09:50' },
-  ],
-  3: [
-    { role: 'customer', text: 'I am looking for Kubota tractors. What models do you have?', time: '08:20' },
-    { role: 'ai', text: 'Welcome! We stock the full Kubota range:\n\n🚜 MU4501 (45 HP) — ₹7.9L\n🚜 MU5501 (55 HP) — ₹9.2L\n🚜 L4508 (45 HP, 4WD) — ₹8.6L\n\nAll models available for test drive. Which HP range suits your farm size?', time: '08:21' },
-    { role: 'customer', text: 'Thanks, will visit next week', time: '08:25' },
-    { role: 'system', text: '✅ Resolved — customer visit scheduled', time: '08:26' },
-  ],
-  4: [
-    { role: 'customer', text: 'शोरूम कधी उघडते?', time: '07:00' },
-    { role: 'ai', text: 'आमचे शोरूम वेळापत्रक:\n\n🕘 सोमवार – शनिवार: सकाळी 9:00 – संध्याकाळी 6:30\n🕙 रविवार: सकाळी 10:00 – दुपारी 2:00\n\nआपण कधी येणार? मी आपल्यासाठी वेळ राखून ठेवतो!', time: '07:00' },
-  ],
-};
+function mapConvStatus(s: string): ConvStatus {
+  if (s === 'escalated') return 'escalated';
+  if (s === 'resolved' || s === 'closed') return 'resolved';
+  return 'active';
+}
 
 const DEFAULT_CONFIG = {
   autoRespond: true,
@@ -110,10 +96,10 @@ interface Toast { id: number; msg: string; type: 'success' | 'error' | 'info' }
 export const AISalesman: React.FC = () => {
   const { dealer } = useStore();
   const [tab, setTab] = useState('conversations');
-  const [conversations, setConversations] = useState<Conv[]>(INITIAL_CONVERSATIONS);
-  const [selectedId, setSelectedId] = useState<number>(1);
+  const [conversations, setConversations] = useState<Conv[]>([]);
+  const [selectedId, setSelectedId] = useState<number>(0);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
-  const [chatMap, setChatMap] = useState<Record<number, ChatMessage[]>>(INITIAL_CHAT_MAP);
+  const [chatMap, setChatMap] = useState<Record<number, ChatMessage[]>>({});
   const [inputMsg, setInputMsg] = useState('');
   const [aiTyping, setAiTyping] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -214,20 +200,35 @@ export const AISalesman: React.FC = () => {
     setAiTyping(false);
   };
 
-  // Refresh conv list
-  const refreshConvs = async () => {
+  // Fetch conversations from API
+  const refreshConvs = useCallback(async (silent = false) => {
     if (!dealer?.id) return;
     try {
-      const data = await api.conversations.list(dealer.id, { limit: 20 });
+      const data = await api.conversations.list(dealer.id, { limit: 50 });
       if (data.conversations?.length) {
-        toast(`Loaded ${data.conversations.length} conversations`, 'info');
+        const mapped: Conv[] = data.conversations.map((c: any) => ({
+          id: c.id,
+          name: c.contact?.name ?? `Contact ${c.contact_id ?? c.id}`,
+          channel: (['whatsapp', 'phone', 'web'].includes(c.channel) ? c.channel : 'web') as Conv['channel'],
+          lastMsg: c.content ?? '',
+          time: c.created_at ? relativeTime(c.created_at) : '—',
+          status: mapConvStatus(c.status ?? 'open'),
+          unread: 0,
+          lang: c.contact?.language ?? 'en',
+        }));
+        setConversations(mapped);
+        if (mapped.length && !selectedId) setSelectedId(mapped[0].id);
+        if (!silent) toast(`Loaded ${mapped.length} conversations`, 'info');
       } else {
-        toast('No new conversations', 'info');
+        if (!silent) toast('No conversations yet', 'info');
       }
     } catch {
-      toast('Could not fetch live conversations', 'info');
+      if (!silent) toast('Could not fetch conversations', 'info');
     }
-  };
+  }, [dealer?.id, selectedId, toast]);
+
+  // Load on mount
+  useEffect(() => { refreshConvs(true); }, [dealer?.id]);
 
   // Filtered conversations
   const filteredConvs = filterTab === 'all' ? conversations : conversations.filter(c => c.status === filterTab);
@@ -329,7 +330,7 @@ export const AISalesman: React.FC = () => {
             <Card className="p-0 overflow-hidden flex flex-col">
               <div className="p-3 border-b border-[var(--border)] flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Conversations</p>
-                <button onClick={refreshConvs} className="p-1 rounded-md hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] hover:text-brand-400 transition-all" title="Refresh">
+                <button onClick={() => refreshConvs(false)} className="p-1 rounded-md hover:bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] hover:text-brand-400 transition-all" title="Refresh">
                   <RefreshCw size={12} />
                 </button>
               </div>

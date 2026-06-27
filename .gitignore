@@ -40,3 +40,5 @@ Thumbs.db
 # Docker volumes (local only)
 postgres-data/
 redis-data/
+.vercel
+.env*

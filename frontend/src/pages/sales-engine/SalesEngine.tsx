@@ -49,14 +49,12 @@ const MOCK_TEMPLATES = [
   },
 ];
 
-// ── Script generator ──────────────────────────────────────────────────────────
+// ── Script type resolver ──────────────────────────────────────────────────────
 
-function generateScript(campaign: Record<string, unknown>, channel: string): string {
-  const name = String(campaign?.name ?? 'Campaign');
-  const goal = String(campaign?.goal ?? '');
-  if (channel === 'voice') return `नमस्कार! मी ${String(campaign?.dealer_name ?? 'AgroDesk')} मधून बोलत आहे.\n\nआपल्याला ${name} बद्दल माहिती द्यायची आहे.\n\n${goal}\n\nआपण आमच्या showroom ला भेट द्यायला आवडेल का? मी आपल्यासाठी appointment book करतो.\n\n[जर होय] — ठीक आहे, मी तुमचे नाव आणि सोयीचा दिवस नोंदवतो.\n[जर नाही] — ठीक आहे, कधी वेळ असेल तेव्हा संपर्क करा. धन्यवाद!`;
-  if (channel === 'whatsapp') return `नमस्कार {नाव} जी! 🙏\n\n*${name}*\n\n${goal}\n\n✅ EMI सुविधा उपलब्ध\n✅ Free Test Drive\n✅ Exchange Offer\n\nअधिक माहितीसाठी reply करा किंवा खाली दिलेल्या link वर click करा 👇\n{link}`;
-  return `${name}\n\n${goal}\n\nContact us: {phone}`;
+function scriptTypeForChannel(channel: string): string {
+  if (channel === 'voice') return 'cold_call_new';
+  if (channel === 'whatsapp') return 'whatsapp_intro';
+  return 'whatsapp_intro';
 }
 
 // ── Stats chart data ──────────────────────────────────────────────────────────
@@ -131,19 +129,40 @@ export const SalesEngine: React.FC = () => {
 
   const openStats = (c: Record<string, unknown>) => { setSelectedCampaign(c); setShowStats(true); };
 
-  const openScript = (c: Record<string, unknown>) => {
+  const openScript = async (c: Record<string, unknown>) => {
+    const channel = (Array.isArray(c.channels) && c.channels[0]) ? String(c.channels[0]) : 'whatsapp';
     setSelectedCampaign(c);
-    setScriptChannel((Array.isArray(c.channels) && c.channels[0]) ? String(c.channels[0]) : 'whatsapp');
-    setScriptText(generateScript(c, (Array.isArray(c.channels) && c.channels[0]) ? String(c.channels[0]) : 'whatsapp'));
+    setScriptChannel(channel);
+    setScriptText('');
     setShowScript(true);
+    setScriptLoading(true);
+    try {
+      const res = await api.ai.script(scriptTypeForChannel(channel), String(c.language ?? dealer?.language ?? 'mr'), {
+        campaign_name: String(c.name ?? ''),
+        goal: String(c.goal ?? ''),
+        dealer_name: dealer?.name ?? 'AgroDesk',
+      });
+      setScriptText(res.script);
+    } catch {
+      setScriptText('Unable to generate script. Please try again.');
+    }
+    setScriptLoading(false);
   };
 
-  const regenerateScript = () => {
+  const regenerateScript = async () => {
+    if (!selectedCampaign) return;
     setScriptLoading(true);
-    setTimeout(() => {
-      if (selectedCampaign) setScriptText(generateScript(selectedCampaign, scriptChannel));
-      setScriptLoading(false);
-    }, 900);
+    try {
+      const res = await api.ai.script(scriptTypeForChannel(scriptChannel), String(selectedCampaign.language ?? dealer?.language ?? 'mr'), {
+        campaign_name: String(selectedCampaign.name ?? ''),
+        goal: String(selectedCampaign.goal ?? ''),
+        dealer_name: dealer?.name ?? 'AgroDesk',
+      });
+      setScriptText(res.script);
+    } catch {
+      setScriptText('Unable to generate script. Please try again.');
+    }
+    setScriptLoading(false);
   };
 
   const copyScript = async () => {
@@ -208,7 +227,7 @@ export const SalesEngine: React.FC = () => {
           ]} active={tab} onChange={setTab} />
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" icon={<Wand2 size={13} />}
-              onClick={() => { setSelectedCampaign(campaigns[0] ?? {}); setScriptChannel('whatsapp'); setScriptText(generateScript(campaigns[0] ?? {}, 'whatsapp')); setShowScript(true); }}>
+              onClick={() => openScript(campaigns[0] ?? {})}>
               AI Script
             </Button>
             <Button size="sm" icon={<Plus size={13} />} onClick={() => setShowNew(true)}>New Campaign</Button>
@@ -542,7 +561,20 @@ export const SalesEngine: React.FC = () => {
             {/* Channel selector */}
             <div className="flex gap-2">
               {(Array.isArray(selectedCampaign.channels) ? selectedCampaign.channels : ['whatsapp']).map((ch: unknown) => (
-                <button key={String(ch)} onClick={() => { setScriptChannel(String(ch)); setScriptText(generateScript(selectedCampaign, String(ch))); }}
+                <button key={String(ch)} onClick={async () => {
+                  setScriptChannel(String(ch));
+                  setScriptLoading(true);
+                  setScriptText('');
+                  try {
+                    const res = await api.ai.script(scriptTypeForChannel(String(ch)), String(selectedCampaign.language ?? dealer?.language ?? 'mr'), {
+                      campaign_name: String(selectedCampaign.name ?? ''),
+                      goal: String(selectedCampaign.goal ?? ''),
+                      dealer_name: dealer?.name ?? 'AgroDesk',
+                    });
+                    setScriptText(res.script);
+                  } catch { setScriptText('Unable to generate script.'); }
+                  setScriptLoading(false);
+                }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-all ${scriptChannel === String(ch) ? 'border-brand-400 bg-[rgba(74,222,128,0.1)] text-brand-400' : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-bright)]'}`}>
                   {CHANNEL_ICONS[String(ch)]}{String(ch)}
                 </button>
@@ -626,4 +658,20 @@ export const SalesEngine: React.FC = () => {
             <div className="flex gap-2 justify-between">
               <div className="flex gap-2">
                 {['Make formal', 'Add offer', 'Shorten'].map(action => (
-                  <butto
+                  <button key={action} className="text-xs px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:border-brand-400/40 hover:text-brand-400 transition-all">
+                    {action}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowEdit(false)}>Cancel</Button>
+                <Button size="sm" icon={<Check size={12} />} onClick={() => setShowEdit(false)}>Save Changes</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+    </div>
+  );
+};

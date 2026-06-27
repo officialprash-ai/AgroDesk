@@ -26,14 +26,6 @@ interface Call {
   added_to_crm?: boolean;
 }
 
-const INITIAL_CALLS: Call[] = [
-  { id: 1, name: 'Mohan Shinde',     phone: '+919876500001', status: 'interested',    duration: 142, language: 'mr', score: 85, time: '10:32 AM', note: 'Wants demo on Saturday' },
-  { id: 2, name: 'Kiran Pawar',      phone: '+919876500002', status: 'not_interested', duration: 38,  language: 'mr', score: 10, time: '10:28 AM', note: 'Already bought from competitor' },
-  { id: 3, name: 'Ashok Kulkarni',   phone: '+919876500003', status: 'callback',      duration: 65,  language: 'hi', score: 60, time: '10:25 AM', note: 'Call back after 5 PM' },
-  { id: 4, name: 'Santosh Yadav',    phone: '+919876500004', status: 'in_progress',   duration: 0,   language: 'mr', score: 0,  time: '10:33 AM', note: '' },
-  { id: 5, name: 'Dnyaneshwar Mane', phone: '+919876500005', status: 'pending',       duration: 0,   language: 'mr', score: 0,  time: '—',        note: '' },
-  { id: 6, name: 'Ramkrishna Nair',  phone: '+919876500006', status: 'interested',    duration: 198, language: 'mr', score: 92, time: '10:18 AM', note: 'Ready to visit, needs financing info' },
-];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   interested:    { label: 'Interested',    color: '#4ade80', icon: CheckCircle },
@@ -101,7 +93,7 @@ export const ColdCalling: React.FC = () => {
   const dealerId = dealer?.id ?? 'd1';
 
   // ── Calls State ──────────────────────────────────────────
-  const [calls, setCalls] = useState<Call[]>(INITIAL_CALLS);
+  const [calls, setCalls] = useState<Call[]>([]);
   const [running, setRunning] = useState(false);
   const [liveTimer, setLiveTimer] = useState(0);
   const [filter, setFilter] = useState('all');
@@ -131,6 +123,25 @@ export const ColdCalling: React.FC = () => {
   const [newCampaignModal, setNewCampaignModal] = useState(false);
   const [newCampaignForm, setNewCampaignForm] = useState({ name: `Cold Call ${new Date().toLocaleDateString('en-IN')}`, goal: 'Outbound lead qualification', language: 'mr' });
   const [newCampaignLoading, setNewCampaignLoading] = useState(false);
+
+  // ── Fetch contacts on mount ──────────────────────────────
+  useEffect(() => {
+    api.contacts.list(dealerId, { limit: 100 }).then(data => {
+      if (data.contacts?.length) {
+        setCalls(data.contacts.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          status: 'pending' as const,
+          duration: 0,
+          language: c.language ?? 'mr',
+          score: c.score ?? 0,
+          time: '—',
+          note: c.notes ?? '',
+        })));
+      }
+    }).catch(() => {});
+  }, [dealerId]);
 
   // ── Live Timer ───────────────────────────────────────────
   useEffect(() => {
@@ -268,7 +279,7 @@ export const ColdCalling: React.FC = () => {
       });
       setCampaignName(newCampaignForm.name);
       setCampaignLang(newCampaignForm.language);
-      setCalls(INITIAL_CALLS.map(c => ({ ...c, status: 'pending', time: '—', duration: 0, score: 0, note: '' })));
+      setCalls([]);
       setRunning(false);
       setNewCampaignModal(false);
       showToast('New campaign created!');
@@ -584,4 +595,21 @@ export const ColdCalling: React.FC = () => {
         </Modal>
 
         {/* ── NEW CAMPAIGN MODAL ───────────────────────────── */}
-        <Modal open={
+        <Modal open={newCampaignModal} onClose={() => setNewCampaignModal(false)} title="New Cold Call Campaign" size="sm">
+          <div className="space-y-4">
+            <Input label="Campaign Name" value={newCampaignForm.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCampaignForm(f => ({ ...f, name: e.target.value }))} />
+            <Input label="Goal / Description" placeholder="e.g. Kharif season tractor outreach" value={newCampaignForm.goal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCampaignForm(f => ({ ...f, goal: e.target.value }))} />
+            <Select label="Call Language" value={newCampaignForm.language} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewCampaignForm(f => ({ ...f, language: e.target.value }))}
+              options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))} />
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setNewCampaignModal(false)}>Cancel</Button>
+              <Button onClick={handleNewCampaign} disabled={newCampaignLoading}>{newCampaignLoading ? 'Creating...' : 'Create Campaign'}</Button>
+            </div>
+          </div>
+        </Modal>
+
+      </div>
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  );
+};
