@@ -2,13 +2,18 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Bell, Search, Globe, Mic, X, CheckCircle, AlertCircle, Info,
+  Bell, Search, Globe, X, CheckCircle, AlertCircle, Info,
   Sun, Moon, LayoutDashboard, Users, Megaphone, Truck,
   IndianRupee, Phone, Bot, FileText, Settings, HelpCircle,
-  BarChart2, Zap, BookOpen, ArrowRight,
+  BarChart2, Zap, BookOpen, ArrowRight, LogOut, UserCircle,
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { cn, LANGUAGES } from '../../lib/utils';
+import {
+  Popover, PopoverTrigger, PopoverContent,
+  PopoverHeader, PopoverTitle, PopoverDescription,
+  PopoverBody, PopoverFooter,
+} from '../ui/popover';
 
 // ── Searchable routes ────────────────────────────────────────────────────────
 const ROUTES = [
@@ -40,7 +45,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
   const {
     notifications, removeNotification, toasts, dismissToast,
     dealer, setLanguage, theme, setTheme,
-    contacts, knowledgeBase,
+    contacts, knowledgeBase, clearAuth,
   } = useAppStore();
 
   // ── theme ──────────────────────────────────────────────────────────────────
@@ -156,13 +161,13 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur-xl">
-        <div>
-          <h1 className="font-display font-semibold text-xl text-[var(--text-primary)] leading-tight">{title}</h1>
-          {subtitle && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
+      <header className="sticky top-0 z-30 flex items-center gap-4 px-6 py-3.5 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur-xl">
+        <div className="flex-1 min-w-0">
+          <h1 className="font-display font-semibold text-xl text-[var(--text-primary)] leading-tight truncate">{title}</h1>
+          {subtitle && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
 
           {/* ── Search bar ──────────────────────────────────────────────────── */}
           <div ref={searchRef} className="relative hidden md:block">
@@ -171,8 +176,8 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
               className={cn(
                 'flex items-center gap-2 h-9 rounded-xl border transition-all duration-200',
                 searchOpen
-                  ? 'w-72 border-[var(--border-brand)] bg-[var(--bg-mid)] shadow-[0_0_0_3px_rgba(74,222,128,0.08)]'
-                  : 'w-56 border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-bright)] cursor-text',
+                  ? 'w-64 border-[var(--border-brand)] bg-[var(--bg-mid)] shadow-[0_0_0_3px_rgba(74,222,128,0.08)]'
+                  : 'w-44 border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-bright)] cursor-text',
               )}
               onClick={openSearch}
               role="button"
@@ -319,12 +324,6 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
             </AnimatePresence>
           </div>
 
-          {/* ── Voice (coming soon) ───────────────────────────────────────── */}
-          <button aria-label="Voice input (coming soon)" disabled title="Voice input — coming soon"
-            className="relative p-2 rounded-xl glass border border-[var(--border)] opacity-50 cursor-not-allowed transition-all">
-            <Mic size={15} className="text-[var(--text-secondary)]" />
-          </button>
-
           {/* ── Theme toggle ──────────────────────────────────────────────── */}
           <button
             aria-label={`Switch theme (current: ${currentTheme.label})`}
@@ -383,10 +382,55 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
             </AnimatePresence>
           </div>
 
-          {/* ── Avatar ───────────────────────────────────────────────────── */}
-          <div className="w-8 h-8 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer">
-            <span className="text-xs font-bold text-brand-400">{initials}</span>
-          </div>
+          {/* ── Avatar / Profile Popover ─────────────────────────────────── */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                aria-label="Open profile menu"
+                className="w-8 h-8 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer hover:bg-brand-400/30 transition-colors"
+              >
+                <span className="text-xs font-bold text-brand-400">{initials}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64">
+              <PopoverHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-brand-400">{initials}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <PopoverTitle className="truncate">{dealer?.name ?? 'AgroDesk User'}</PopoverTitle>
+                    <PopoverDescription className="truncate">{dealer?.location ?? dealer?.city ?? 'Dealer'}</PopoverDescription>
+                  </div>
+                </div>
+              </PopoverHeader>
+              <PopoverBody className="flex flex-col gap-1 py-1">
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors text-left"
+                >
+                  <Settings size={15} />
+                  Settings
+                </button>
+                <button
+                  onClick={() => navigate('/help')}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors text-left"
+                >
+                  <HelpCircle size={15} />
+                  Help & Support
+                </button>
+              </PopoverBody>
+              <PopoverFooter>
+                <button
+                  onClick={() => { clearAuth(); navigate('/login'); }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors text-left"
+                >
+                  <LogOut size={15} />
+                  Sign out
+                </button>
+              </PopoverFooter>
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
 

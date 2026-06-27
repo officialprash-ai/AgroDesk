@@ -96,6 +96,19 @@ router.patch('/:id/confirm', async (req, res) => {
   }
 });
 
+// DELETE /api/documents/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const existing = await prisma.document.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
+    await prisma.document.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
 // POST /api/documents/send-to-accountant
 router.post('/send-to-accountant', async (req, res) => {
   try {

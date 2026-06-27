@@ -6,7 +6,7 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { BILL_CATEGORIES } from '../../lib/utils';
-import { FileText, Upload, Send, CheckCircle, Clock, Plus, Phone, Mail, Building, ChevronRight, Camera, Tractor, Cog, Wrench, Banknote, Folder } from 'lucide-react';
+import { FileText, Upload, Send, CheckCircle, Clock, Plus, Phone, Mail, Building, ChevronRight, Camera, Tractor, Cog, Wrench, Banknote, Folder, Trash2 } from 'lucide-react';
 
 const MONTH_STEPS = [
   { key: 'tractor_purchase', label: 'Tractor Purchase Bills', icon: Tractor },
@@ -213,10 +213,10 @@ export const AIAccountant: React.FC = () => {
           <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="ag-table">
-                <thead><tr><th>Category</th><th>Period</th><th>Filename</th><th>OCR</th><th>Tally</th><th>Status</th></tr></thead>
+                <thead><tr><th>Category</th><th>Period</th><th>Filename</th><th>OCR</th><th>Tally</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {docs.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center text-[var(--text-muted)] py-8">No documents yet</td></tr>
+                    <tr><td colSpan={7} className="text-center text-[var(--text-muted)] py-8">No documents yet</td></tr>
                   ) : docs.map(d => (
                     <tr key={d.id}>
                       <td className="font-medium text-[var(--text-primary)]">{d.category}</td>
@@ -225,6 +225,19 @@ export const AIAccountant: React.FC = () => {
                       <td>{d.ocr_data ? <Badge variant="active">Done</Badge> : <Badge variant="pending">Pending</Badge>}</td>
                       <td>{d.tally_synced ? <Badge variant="active">Synced</Badge> : <Badge variant="info">No</Badge>}</td>
                       <td><Badge variant={d.confirmed ? 'active' : 'pending'}>{d.confirmed ? 'Confirmed' : 'Unconfirmed'}</Badge></td>
+                      <td>
+                        <button
+                          aria-label="Delete document"
+                          onClick={async () => {
+                            if (!confirm('Delete this document record?')) return;
+                            await api.documents.delete(d.id);
+                            refetchDocs();
+                          }}
+                          className="text-[var(--text-muted)] hover:text-red-400 transition-colors p-1 rounded"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -7,6 +7,45 @@
    Theme: True-black base · Emerald accent · Premium SaaS
    ───────────────────────────────────────────── */
 
+/* ── shadcn/ui compatibility tokens ── */
+:root {
+  --popover: 0F1011;
+  --popover-foreground: #F4F4F5;
+  --foreground: #F4F4F5;
+  --muted-foreground: rgba(244, 244, 245, 0.38);
+  --muted: rgba(255, 255, 255, 0.06);
+  --accent: rgba(255, 255, 255, 0.06);
+  --accent-foreground: #F4F4F5;
+  --primary: #22C55E;
+  --primary-foreground: #09090B;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: #F4F4F5;
+  --destructive: #ef4444;
+  --destructive-foreground: #fff;
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: rgba(34, 197, 94, 0.5);
+  --background: #09090B;
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] {
+  --popover-foreground: #111318;
+  --foreground: #111318;
+  --muted-foreground: #7A828E;
+  --muted: #F4F6F8;
+  --accent: #F4F6F8;
+  --accent-foreground: #111318;
+  --primary: #16A34A;
+  --primary-foreground: #fff;
+  --secondary: rgba(0,0,0,0.06);
+  --secondary-foreground: #111318;
+  --destructive: #ef4444;
+  --destructive-foreground: #fff;
+  --input: rgba(0, 0, 0, 0.10);
+  --ring: rgba(22, 163, 74, 0.4);
+  --background: #F4F6F8;
+  --border-color: rgba(0, 0, 0, 0.10);
+}
+
 /* ── DARK MODE (default) ── */
 :root,
 [data-theme="dark"] {

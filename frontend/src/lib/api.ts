@@ -93,6 +93,7 @@ export const api = {
       return req<{ documents: any[]; total: number }>(`/api/documents?${q}`);
     },
     confirm: (id: string) => req<{ document: any; success: boolean }>(`/api/documents/${id}/confirm`, { method: 'PATCH' }),
+    delete: (id: string) => req<{ success: boolean }>(`/api/documents/${id}`, { method: 'DELETE' }),
     sendToAccountant: (data: { dealer_id: string; accountant_id: string; period_month: string }) => req<{ success: boolean; sent: number; to: string }>('/api/documents/send-to-accountant', { method: 'POST', body: JSON.stringify(data) }),
     accountants: (dealer_id: string) => req<{ accountants: any[] }>(`/api/documents/accountants?dealer_id=${dealer_id}`),
   },
