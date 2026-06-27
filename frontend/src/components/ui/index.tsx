@@ -423,10 +423,10 @@ export const SearchInput: React.FC<{
       <path d="m21 21-4.35-4.35" />
     </svg>
     <input
-      value={value}
-      onChange={e => onChange(e.target.value)}
+      value={value}      onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       className="ag-input pl-8 text-sm py-2"
     />
   </div>
 );
+
