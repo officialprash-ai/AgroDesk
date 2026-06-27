@@ -667,11 +667,11 @@ export const SalesEngine: React.FC = () => {
                 <Button variant="ghost" size="sm" onClick={() => setShowEdit(false)}>Cancel</Button>
                 <Button size="sm" icon={<Check size={12} />} onClick={() => setShowEdit(false)}>Save Changes</Button>
               </div>
+
             </div>
           </div>
         )}
       </Modal>
-
     </div>
   );
 };

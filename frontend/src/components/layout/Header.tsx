@@ -5,7 +5,7 @@ import {
   Bell, Search, Globe, X, CheckCircle, AlertCircle, Info,
   Sun, Moon, LayoutDashboard, Users, Megaphone, Truck,
   IndianRupee, Phone, Bot, FileText, Settings, HelpCircle,
-  BarChart2, Zap, BookOpen, ArrowRight, LogOut, UserCircle,
+  BarChart2, Zap, BookOpen, ArrowRight, LogOut,
 } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { cn, LANGUAGES } from '../../lib/utils';
@@ -400,7 +400,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                   </div>
                   <div className="min-w-0">
                     <PopoverTitle className="truncate">{dealer?.name ?? 'AgroDesk User'}</PopoverTitle>
-                    <PopoverDescription className="truncate">{dealer?.location ?? dealer?.city ?? 'Dealer'}</PopoverDescription>
+                    <PopoverDescription className="truncate">{dealer?.city ?? 'Dealer'}</PopoverDescription>
                   </div>
                 </div>
               </PopoverHeader>

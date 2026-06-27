@@ -476,20 +476,11 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="flex flex-col items-center justify-center py-6 gap-3">
                 <Truck size={24} className="text-[var(--text-muted)] opacity-40" />
-                <p className="text-xs text-[var(--text-muted)] text-center leading-relaxed">
-                  Open Used Tractor page<br />to view urgency scores
-                </p>
-                <Link
-                  to="/used-tractor"
-                  className="text-xs font-medium text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
-                >
-                  Go to inventory <ArrowRight size={11} />
-                </Link>
+                <p className="text-xs text-[var(--text-muted)] text-center">Open Used Tractor page<br />to view urgency scores</p>
               </div>
             </Card>
           </div>
         </FadeUp>
-
       </div>
     </div>
   );
