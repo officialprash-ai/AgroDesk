@@ -87,59 +87,99 @@ export const Dashboard: React.FC = () => {
   };
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const location = [dealer?.city, dealer?.district].filter(Boolean).join(', ');
-  const subtitle = [`${greeting}, ${dealer?.name ?? 'Dealer'}`, location].filter(Boolean).join(' · ');
+
+  // ── Time-aware greeting config ──────────────────────────────────────────────
+  const greetingConfig = (() => {
+    if (hour >= 5 && hour < 12) return {
+      label: 'Good morning',
+      emoji: '☀️',
+      quips: ['Rise and harvest! 🚜', 'Fields are calling!', 'A fresh day, a full pipeline 🌱', 'Time to sow some leads!'],
+      gradient: 'from-[rgba(251,191,36,0.08)] via-[rgba(74,222,128,0.05)] to-transparent',
+      accent: '#fbbf24',
+      tag: 'Morning shift',
+    };
+    if (hour >= 12 && hour < 17) return {
+      label: 'Good afternoon',
+      emoji: '🌤️',
+      quips: ["Tractors don't take lunch breaks 🚜", 'Half the day, double the hustle!', 'Keeping the momentum going 💪', 'Stay sharp, the harvest waits!'],
+      gradient: 'from-[rgba(96,165,250,0.08)] via-[rgba(74,222,128,0.04)] to-transparent',
+      accent: '#60a5fa',
+      tag: 'Afternoon push',
+    };
+    if (hour >= 17 && hour < 21) return {
+      label: 'Good evening',
+      emoji: '🌆',
+      quips: ["Great work today, farmer! 🌾", 'Wrapping up the day\'s harvest', 'The sun sets on a productive day ✨', 'Evening glow, pipeline grows 🌿'],
+      gradient: 'from-[rgba(167,139,250,0.08)] via-[rgba(74,222,128,0.04)] to-transparent',
+      accent: '#a78bfa',
+      tag: 'Evening review',
+    };
+    return {
+      label: 'Good night',
+      emoji: '🌙',
+      quips: ["Tomorrow's seeds are today's dreams ⭐", 'Rest well, the fields will wait', 'Night owl or early bird — you grind! 💤', "Stars and sales don't sleep 🌟"],
+      gradient: 'from-[rgba(148,163,184,0.08)] via-[rgba(74,222,128,0.03)] to-transparent',
+      accent: '#94a3b8',
+      tag: 'Late session',
+    };
+  })();
+
+  const randomQuip = greetingConfig.quips[Math.floor(Date.now() / 1000 / 3600) % greetingConfig.quips.length];
+  const subtitle = [`${greetingConfig.label}, ${dealer?.name ?? 'Dealer'}`, location].filter(Boolean).join(' · ');
 
   return (
     <div className="flex-1 overflow-auto">
       <Header title="Dashboard" subtitle={subtitle} />
       <div className="p-6 space-y-5">
 
-        {/* ── Season Banner ─────────────────────────────────────────────── */}
+        {/* ── Greeting Banner ───────────────────────────────────────────── */}
         <FadeUp delay={0}>
-          <div className="relative overflow-hidden rounded-2xl border border-[var(--border-brand)] bg-gradient-to-r from-[rgba(34,197,94,0.05)] via-[rgba(34,197,94,0.03)] to-transparent px-6 py-3.5">
-            {/* Wheat stalks */}
-            <div className="absolute left-5 top-0 bottom-0 flex items-end gap-2 opacity-[0.15] pointer-events-none select-none" aria-hidden="true">
-              {[-4, 0, 5].map((rot, i) => (
-                <svg key={i} className="h-12 w-4 text-brand-400 wheat-sway" style={{ transform: `rotate(${rot}deg)`, animationDelay: `${i * 0.4}s` }} viewBox="0 0 20 56" fill="none">
-                  <line x1="10" y1="56" x2="10" y2="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <ellipse cx="15" cy="10" rx="4" ry="2.2" fill="currentColor" transform="rotate(30 15 10)"/>
-                  <ellipse cx="5" cy="18" rx="4" ry="2.2" fill="currentColor" transform="rotate(-30 5 18)"/>
-                  <ellipse cx="15" cy="26" rx="4" ry="2.2" fill="currentColor" transform="rotate(30 15 26)"/>
-                  <ellipse cx="5" cy="34" rx="4" ry="2.2" fill="currentColor" transform="rotate(-30 5 34)"/>
-                  <ellipse cx="10" cy="4" rx="3" ry="1.8" fill="currentColor"/>
-                </svg>
-              ))}
-            </div>
+          <div className={`relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-r ${greetingConfig.gradient} px-5 py-3`}>
+            {/* Left glow blob */}
+            <div
+              className="absolute -left-4 top-1/2 -translate-y-1/2 w-20 h-20 rounded-full blur-2xl opacity-20 pointer-events-none"
+              style={{ background: greetingConfig.accent }}
+              aria-hidden="true"
+            />
 
-            <div className="text-center">
-              <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-brand-400/70 mb-0.5">Kharif Season 2024 · Maharashtra</p>
-              <p className="text-sm font-display font-medium text-[var(--text-secondary)]">
-                Dealership intelligence active for{' '}
-                <span className="text-brand-400 font-semibold">{location || 'your region'}</span>
-              </p>
-            </div>
+            <div className="relative flex items-center justify-between gap-4">
+              {/* Emoji + greeting */}
+              <div className="flex items-center gap-3 min-w-0">
+                <motion.span
+                  key={greetingConfig.emoji}
+                  initial={{ scale: 0.6, rotate: -15, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.1 }}
+                  className="text-2xl select-none flex-shrink-0"
+                  aria-hidden="true"
+                >
+                  {greetingConfig.emoji}
+                </motion.span>
 
-            <div className="absolute right-5 top-0 bottom-0 flex items-center opacity-[0.12] pointer-events-none select-none" aria-hidden="true">
-              <svg className="h-12 w-auto text-brand-400 tractor-float" viewBox="0 0 110 70" fill="none">
-                <circle cx="28" cy="46" r="20" stroke="currentColor" strokeWidth="2.5"/>
-                <circle cx="28" cy="46" r="13" stroke="currentColor" strokeWidth="1.5" strokeDasharray="5 4"/>
-                <circle cx="28" cy="46" r="3" fill="currentColor"/>
-                <line x1="28" y1="26" x2="28" y2="66" stroke="currentColor" strokeWidth="1"/>
-                <line x1="8" y1="46" x2="48" y2="46" stroke="currentColor" strokeWidth="1"/>
-                <line x1="14" y1="32" x2="42" y2="60" stroke="currentColor" strokeWidth="1"/>
-                <line x1="42" y1="32" x2="14" y2="60" stroke="currentColor" strokeWidth="1"/>
-                <circle cx="88" cy="52" r="14" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="88" cy="52" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3"/>
-                <circle cx="88" cy="52" r="2.5" fill="currentColor"/>
-                <rect x="30" y="38" width="60" height="7" rx="2.5" fill="currentColor" opacity="0.5"/>
-                <rect x="34" y="16" width="24" height="25" rx="3" fill="currentColor" opacity="0.25"/>
-                <rect x="34" y="16" width="24" height="25" rx="3" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="38" y="20" width="16" height="12" rx="2" fill="currentColor" opacity="0.4"/>
-                <rect x="57" y="21" width="22" height="18" rx="2" fill="currentColor" opacity="0.35"/>
-                <rect x="76" y="12" width="4" height="13" rx="2" fill="currentColor" opacity="0.65"/>
-              </svg>
+                <div className="min-w-0">
+                  <p className="text-sm font-display font-semibold text-[var(--text-primary)] leading-tight">
+                    {greetingConfig.label},{' '}
+                    <span style={{ color: greetingConfig.accent }}>
+                      {dealer?.name ?? 'Farmer'}!
+                    </span>
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{randomQuip}</p>
+                </div>
+              </div>
+
+              {/* Right: tag + location */}
+              <div className="flex-shrink-0 text-right hidden sm:block">
+                <span
+                  className="inline-block text-[10px] font-bold tracking-[0.12em] uppercase px-2 py-0.5 rounded-full"
+                  style={{ background: `${greetingConfig.accent}18`, color: greetingConfig.accent }}
+                >
+                  {greetingConfig.tag}
+                </span>
+                {location && (
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1 tabular-nums">{location}</p>
+                )}
+              </div>
             </div>
           </div>
         </FadeUp>
@@ -338,4 +378,119 @@ export const Dashboard: React.FC = () => {
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                    
+                        <div
+                          className="text-xs font-bold tabular-nums"
+                          style={{ color: c.score >= 90 ? '#ef4444' : c.score >= 70 ? '#fbbf24' : '#4ade80' }}
+                        >
+                          {c.score}
+                        </div>
+                        <p className="text-[9px] text-[var(--text-muted)]">score</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </FadeUp>
+
+        {/* ── Bottom Row ────────────────────────────────────────────────── */}
+        <FadeUp delay={0.16}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Recovery Status */}
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-semibold text-sm text-[var(--text-primary)]">Recovery Status</h3>
+                <Link to="/money-recovery" className="text-[11px] text-brand-400 hover:text-brand-300 transition-colors">
+                  View →
+                </Link>
+              </div>
+              {topCases.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] py-4 text-center">No active cases</p>
+              ) : (
+                <div className="space-y-3">
+                  {topCases.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          r.escalation_stage === 'legal' ? 'bg-red-500' :
+                          r.escalation_stage === 'stern' ? 'bg-orange-500' :
+                          r.escalation_stage === 'firm' ? 'bg-yellow-500' : 'bg-brand-400'
+                        }`} />
+                        <span className="text-xs text-[var(--text-primary)] truncate">{r.customer_name}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-amber-400 flex-shrink-0 tabular-nums">
+                        {formatCurrency(r.amount_due)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                <ProgressBar
+                  value={0}
+                  max={Math.max(m?.pending_recovery ?? 1, 1)}
+                  label="Resolved this month"
+                  color="#4ade80"
+                />
+              </div>
+            </Card>
+
+            {/* Active Campaigns */}
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-semibold text-sm text-[var(--text-primary)]">Active Campaigns</h3>
+                <Link to="/sales-engine" className="text-[11px] text-brand-400 hover:text-brand-300 transition-colors">
+                  View →
+                </Link>
+              </div>
+              {runningCampaigns.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)] py-4 text-center">No active campaigns</p>
+              ) : (
+                <div className="space-y-4">
+                  {runningCampaigns.slice(0, 3).map((c: any) => (
+                    <div key={c.id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-[var(--text-primary)] truncate flex-1">{c.name}</span>
+                        <Badge variant="active" className="ml-2 text-[10px]">Live</Badge>
+                      </div>
+                      <ProgressBar
+                        value={c.sent ?? 0}
+                        max={Math.max(c.total_contacts ?? 1, 1)}
+                        color="#60a5fa"
+                        label={`${c.sent ?? 0}/${c.total_contacts ?? 0} sent`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Urgent Inventory */}
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-semibold text-sm text-[var(--text-primary)]">Urgent Inventory</h3>
+                <Link to="/used-tractor" className="text-[11px] text-brand-400 hover:text-brand-300 transition-colors">
+                  View →
+                </Link>
+              </div>
+              <div className="flex flex-col items-center justify-center py-6 gap-3">
+                <Truck size={24} className="text-[var(--text-muted)] opacity-40" />
+                <p className="text-xs text-[var(--text-muted)] text-center leading-relaxed">
+                  Open Used Tractor page<br />to view urgency scores
+                </p>
+                <Link
+                  to="/used-tractor"
+                  className="text-xs font-medium text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
+                >
+                  Go to inventory <ArrowRight size={11} />
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </FadeUp>
+
+      </div>
+    </div>
+  );
+};
