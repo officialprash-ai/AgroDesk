@@ -12,7 +12,6 @@
  *  - Updates AgentJob status in Postgres on success / failure
  */
 
-import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 
 if (process.env.SENTRY_DSN) {
