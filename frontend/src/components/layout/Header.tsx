@@ -44,7 +44,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
   const navigate = useNavigate();
   const {
     notifications, removeNotification, toasts, dismissToast,
-    dealer, setLanguage, theme, setTheme,
+    dealer, dealerLogo, setLanguage, theme, setTheme,
     contacts, knowledgeBase, clearAuth,
   } = useAppStore();
 
@@ -387,16 +387,20 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
             <PopoverTrigger asChild>
               <button
                 aria-label="Open profile menu"
-                className="w-8 h-8 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer hover:bg-brand-400/30 transition-colors"
+                className="w-8 h-8 rounded-full overflow-hidden bg-brand-400/20 border border-brand-400/30 flex items-center justify-center cursor-pointer hover:bg-brand-400/30 transition-colors"
               >
-                <span className="text-xs font-bold text-brand-400">{initials}</span>
+                {dealerLogo
+                  ? <img src={dealerLogo} alt={dealer?.name ?? 'Profile'} className="w-full h-full object-contain p-0.5 bg-white/5" />
+                  : <span className="text-xs font-bold text-brand-400">{initials}</span>}
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64">
               <PopoverHeader>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-400/20 border border-brand-400/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-bold text-brand-400">{initials}</span>
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-brand-400/20 border border-brand-400/30 flex items-center justify-center flex-shrink-0">
+                    {dealerLogo
+                      ? <img src={dealerLogo} alt={dealer?.name ?? 'Profile'} className="w-full h-full object-contain p-0.5 bg-white/5" />
+                      : <span className="text-sm font-bold text-brand-400">{initials}</span>}
                   </div>
                   <div className="min-w-0">
                     <PopoverTitle className="truncate">{dealer?.name ?? 'AgroDesk User'}</PopoverTitle>
