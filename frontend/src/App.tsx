@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { Login } from './pages/auth/Login';
 import { useAppStore } from './store';
@@ -43,11 +43,18 @@ const PageSkeleton: React.FC = () => (
 
 // ─── Error boundary ───────────────────────────────────────────
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
+  { children: React.ReactNode; resetKey?: string },
   { error: Error | null }
 > {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidUpdate(prev: { resetKey?: string }) {
+    // Recover automatically when the route changes, so a crash on one page
+    // doesn't persist onto every other page.
+    if (this.state.error && prev.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
+    }
+  }
   render() {
     if (this.state.error) return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-8">
@@ -152,6 +159,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+const RoutedErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
+
 function App() {
   const { token, theme } = useAppStore();
 
@@ -165,7 +177,7 @@ function App() {
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
         <AppLayout>
-          <ErrorBoundary>
+          <RoutedErrorBoundary>
             <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -183,7 +195,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-          </ErrorBoundary>
+          </RoutedErrorBoundary>
         </AppLayout>
       </BrowserRouter>
     </MotionConfig>
