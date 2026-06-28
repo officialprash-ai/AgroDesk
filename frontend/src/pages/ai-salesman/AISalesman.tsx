@@ -309,7 +309,7 @@ export const AISalesman: React.FC = () => {
             { label: 'Active Chats', value: active, icon: <MessageSquare size={16} />, accent: '#4ade80' },
             { label: 'Resolved Today', value: resolved, icon: <CheckCircle size={16} />, accent: '#60a5fa' },
             { label: 'Escalated', value: escalated, icon: <AlertTriangle size={16} />, accent: '#fbbf24' },
-            { label: 'Avg Response', value: '< 10s', icon: <Zap size={16} />, accent: '#a78bfa' },
+            { label: 'Total Chats', value: conversations.length, icon: <Zap size={16} />, accent: '#a78bfa' },
           ] as any[]).map((m, i) => (
             <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
               <MetricCard {...m} />

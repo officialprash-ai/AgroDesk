@@ -123,6 +123,10 @@ export const MoneyRecovery: React.FC = () => {
 
   const filtered = tab === 'all' ? recoveryCases : recoveryCases.filter((r: any) => r.escalation_stage === tab);
   const totalDue = recoveryCases.reduce((a: number, r: any) => a + r.amount_due, 0);
+  const _mtdStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const _resolvedMtd = recoveryCases.filter((r: any) => r.status === 'resolved' && new Date(r.updated_at) >= _mtdStart);
+  const resolvedMtdAmount = _resolvedMtd.reduce((a: number, r: any) => a + r.amount_due, 0);
+  const resolvedMtdCount = _resolvedMtd.length;
 
   // ── Handlers ─────────────────────────────────────────────
   const handleBulkRun = async () => {
@@ -254,7 +258,7 @@ export const MoneyRecovery: React.FC = () => {
             { label: 'Total Pending', value: formatCurrency(totalDue), sub: `${recoveryCases.length} cases`, icon: <IndianRupee size={16} />, accent: '#fbbf24' },
             { label: 'Legal Stage', value: recoveryCases.filter((r: any) => r.escalation_stage === 'legal').length, sub: 'Need approval', icon: <Shield size={16} />, accent: '#ef4444' },
             { label: 'PTPs Today', value: recoveryCases.filter((r: any) => r.ptp_date).length, sub: 'Promise to pay', icon: <Clock size={16} />, accent: '#60a5fa' },
-            { label: 'Resolved MTD', value: '₹8.4L', sub: '6 cases closed', icon: <CheckCircle size={16} />, accent: '#4ade80' },
+            { label: 'Resolved MTD', value: formatCurrency(resolvedMtdAmount), sub: `${resolvedMtdCount} cases closed`, icon: <CheckCircle size={16} />, accent: '#4ade80' },
           ] as any[]).map((m, i) => (
             <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
               <MetricCard {...m} />

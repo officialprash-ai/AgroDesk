@@ -118,7 +118,7 @@ export const api = {
     create: (data: { dealer_id: string; contact_id: string; campaign_id?: string; channel: string; direction?: string; content: string; status?: string; twilio_sid?: string }) =>
       req<{ conversation: any; success: boolean }>('/api/conversations', { method: 'POST', body: JSON.stringify(data) }),
     stats: (dealer_id: string) =>
-      req<{ total: number; byChannel: Record<string, number>; byIntent: Record<string, number> }>(`/api/conversations/stats?dealer_id=${dealer_id}`),
+      req<{ total: number; sent: number; responses: number; interested: number; byChannel: Record<string, number>; byIntent: Record<string, number> }>(`/api/conversations/stats?dealer_id=${dealer_id}`),
   },
 
   jobs: {

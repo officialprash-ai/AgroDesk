@@ -89,7 +89,7 @@ router.get('/stats', async (req, res) => {
     const dealer_id = (req as AuthRequest).dealer_id!;
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const [total, byChannel, byIntent, byDay] = await Promise.all([
+    const [total, byChannel, byIntent, byDay, sent, responses] = await Promise.all([
       prisma.conversation.count({ where: { dealer_id, created_at: { gte: since } } }),
       prisma.conversation.groupBy({
         by: ['channel'],
@@ -109,12 +109,16 @@ router.get('/stats', async (req, res) => {
         GROUP BY DATE(created_at)
         ORDER BY day ASC
       `,
+      prisma.conversation.count({ where: { dealer_id, direction: 'outbound', created_at: { gte: since } } }),
+      prisma.conversation.count({ where: { dealer_id, direction: 'inbound', created_at: { gte: since } } }),
     ]);
 
+    const byIntentObj = Object.fromEntries(byIntent.map((r: any) => [r.intent ?? 'unknown', r._count]));
     res.json({
-      total,
+      total, sent, responses,
+      interested: byIntentObj['interested'] ?? 0,
       byChannel: Object.fromEntries(byChannel.map((r: any) => [r.channel, r._count])),
-      byIntent: Object.fromEntries(byIntent.map((r: any) => [r.intent ?? 'unknown', r._count])),
+      byIntent: byIntentObj,
       byDay: byDay.map((r: any) => ({ day: r.day, count: Number(r.count) })),
     });
   } catch (err) {

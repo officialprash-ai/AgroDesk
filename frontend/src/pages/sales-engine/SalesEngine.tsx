@@ -24,15 +24,8 @@ const CHANNEL_COLORS: Record<string, string> = {
   voice: '#fbbf24', whatsapp: '#4ade80', sms: '#60a5fa', email: '#a78bfa',
 };
 
-const SCHEDULE_SLOTS = [
-  { day: 'Mon', time: '09:00', count: 87, status: 'sent' },
-  { day: 'Mon', time: '17:00', count: 45, status: 'sent' },
-  { day: 'Tue', time: '10:00', count: 120, status: 'sent' },
-  { day: 'Wed', time: '09:30', count: 98, status: 'pending' },
-  { day: 'Thu', time: '11:00', count: 150, status: 'pending' },
-  { day: 'Fri', time: '09:00', count: 200, status: 'scheduled' },
-  { day: 'Sat', time: '10:00', count: 75, status: 'scheduled' },
-];
+// Scheduled sends come from real campaign scheduling (none yet → empty)
+const SCHEDULE_SLOTS: { day: string; time: string; count: number; status: string }[] = [];
 
 const MOCK_TEMPLATES = [
   {
@@ -85,6 +78,7 @@ export const SalesEngine: React.FC = () => {
   const { dealer } = useAppStore();
   const dealerId = dealer?.id ?? 'd1';
   const { data, refetch } = useApi(() => api.campaigns.list(dealerId), [dealerId]);
+  const { data: convStats } = useApi(() => api.conversations.stats(dealerId), [dealerId]);
   const campaigns: Record<string, unknown>[] = (data as { campaigns?: Record<string, unknown>[] } | undefined)?.campaigns ?? [];
 
   // tab
@@ -207,10 +201,10 @@ export const SalesEngine: React.FC = () => {
         {/* Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {([
-            { label: 'Active Campaigns', value: campaignsByStatus.running, icon: <Megaphone size={16} />, accent: '#4ade80', trend: { value: 12, label: 'vs last month' } },
-            { label: 'Messages Sent', value: '1,284', sub: 'This month', icon: <Zap size={16} />, accent: '#60a5fa', trend: { value: 8, label: 'vs last month' } },
-            { label: 'Responses', value: '312', sub: '24.3% rate', icon: <Users size={16} />, accent: '#fbbf24', trend: { value: 3, label: 'vs last month' } },
-            { label: 'Interested Leads', value: '87', sub: 'From campaigns', icon: <Target size={16} />, accent: '#a78bfa', trend: { value: 15, label: 'vs last month' } },
+            { label: 'Active Campaigns', value: campaignsByStatus.running, icon: <Megaphone size={16} />, accent: '#4ade80' },
+            { label: 'Messages Sent', value: (convStats?.sent ?? 0).toLocaleString(), sub: 'Last 30 days', icon: <Zap size={16} />, accent: '#60a5fa' },
+            { label: 'Responses', value: (convStats?.responses ?? 0).toLocaleString(), sub: `${convStats?.sent ? Math.round((convStats.responses / convStats.sent) * 100) : 0}% response rate`, icon: <Users size={16} />, accent: '#fbbf24' },
+            { label: 'Interested Leads', value: convStats?.interested ?? 0, sub: 'From conversations', icon: <Target size={16} />, accent: '#a78bfa' },
           ] as any[]).map((m, i) => (
             <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
               <MetricCard {...m} />
@@ -411,6 +405,9 @@ export const SalesEngine: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {SCHEDULE_SLOTS.filter(s => s.status !== 'sent').length === 0 && (
+                <p className="text-xs text-[var(--text-muted)] py-3 text-center">No scheduled sends yet — schedule a campaign to see it here.</p>
+              )}
             </Card>
           </div>
         )}
