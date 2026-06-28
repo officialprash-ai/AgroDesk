@@ -65,7 +65,7 @@ export const Dashboard: React.FC = () => {
   const { data: contactsData } = useApi(() => api.contacts.list(dealerId, { limit: 10 }), [dealerId]);
   const { data: recoveryData } = useApi(() => api.recovery.list(dealerId), [dealerId]);
   const { data: campaignsData } = useApi(() => api.campaigns.list(dealerId), [dealerId]);
-  const { data: activityData } = useApi(() => api.dashboard.activity(dealerId, 6), [dealerId]);
+  const { data: activityData, refetch: refetchActivity } = useApi(() => api.dashboard.activity(dealerId, 6), [dealerId]);
   const { data: chartsData } = useApi(() => api.dashboard.charts(dealerId), [dealerId]);
 
   const m = metricsData;
@@ -82,6 +82,12 @@ export const Dashboard: React.FC = () => {
   }));
   const channelTotal = channels.reduce((a: number, c: any) => a + c.value, 0);
   const trends = chartsData?.trends;
+  const [clearingJobs, setClearingJobs] = React.useState(false);
+  const handleClearActivity = async () => {
+    setClearingJobs(true);
+    try { await api.dashboard.clearActivity(dealerId); await refetchActivity(); } catch (e) { console.error(e); }
+    setClearingJobs(false);
+  };
 
   const agentTypeLabel: Record<string, string> = {
     cold_calling: 'Cold Calling', money_recovery: 'Money Recovery',
@@ -334,6 +340,16 @@ export const Dashboard: React.FC = () => {
                     />
                   ))}
                   <span className="text-[11px] text-brand-400 ml-1.5 tabular-nums">{activity.length} jobs</span>
+                  {activity.length > 0 && (
+                    <button
+                      onClick={handleClearActivity}
+                      disabled={clearingJobs}
+                      title="Clear pending/stuck jobs"
+                      className="text-[10px] text-[var(--text-muted)] hover:text-red-400 transition-colors ml-2 disabled:opacity-50"
+                    >
+                      {clearingJobs ? 'Clearing…' : 'Clear'}
+                    </button>
+                  )}
                 </div>
               </div>
               {activity.length === 0 ? (

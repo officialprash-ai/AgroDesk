@@ -138,4 +138,18 @@ router.get('/charts', async (req, res) => {
   }
 });
 
+router.delete('/activity', async (req, res) => {
+  try {
+    const dealer_id = (req as AuthRequest).dealer_id ?? (req.query.dealer_id as string);
+    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    const result = await prisma.agentJob.deleteMany({
+      where: { dealer_id, status: { in: ['pending', 'queued', 'failed'] } },
+    });
+    res.json({ success: true, cleared: result.count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to clear activity' });
+  }
+});
+
 export default router;
