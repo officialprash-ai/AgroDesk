@@ -17,18 +17,13 @@ import {
   ArrowRight, TrendingUp, Sparkles, CheckCircle, Activity,
 } from 'lucide-react';
 
-// ─── Static chart data ────────────────────────────────────────────────────────
-const salesData = [
-  { month: 'Aug', sales: 22, enquiries: 145 }, { month: 'Sep', sales: 28, enquiries: 178 },
-  { month: 'Oct', sales: 31, enquiries: 210 }, { month: 'Nov', sales: 27, enquiries: 192 },
-  { month: 'Dec', sales: 34, enquiries: 234 }, { month: 'Jan', sales: 38, enquiries: 267 },
-];
-const channelData = [
-  { name: 'WhatsApp', value: 45, color: '#4ade80' },
-  { name: 'Voice',    value: 28, color: '#60a5fa' },
-  { name: 'SMS',      value: 18, color: '#fbbf24' },
-  { name: 'Walk-in',  value: 9,  color: '#a78bfa' },
-];
+// ─── Channel display metadata (real counts come from the API) ─────────────────
+const CHANNEL_META: Record<string, { name: string; color: string }> = {
+  whatsapp: { name: 'WhatsApp', color: '#4ade80' },
+  voice:    { name: 'Voice',    color: '#60a5fa' },
+  sms:      { name: 'SMS',      color: '#fbbf24' },
+  email:    { name: 'Email',    color: '#a78bfa' },
+};
 
 // ─── Custom chart tooltip ─────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -71,12 +66,22 @@ export const Dashboard: React.FC = () => {
   const { data: recoveryData } = useApi(() => api.recovery.list(dealerId), [dealerId]);
   const { data: campaignsData } = useApi(() => api.campaigns.list(dealerId), [dealerId]);
   const { data: activityData } = useApi(() => api.dashboard.activity(dealerId, 6), [dealerId]);
+  const { data: chartsData } = useApi(() => api.dashboard.charts(dealerId), [dealerId]);
 
   const m = metricsData;
   const hotLeads = (contactsData?.contacts ?? []).filter((c: any) => c.score >= 70).slice(0, 4);
   const topCases = (recoveryData?.cases ?? []).slice(0, 3);
   const runningCampaigns = (campaignsData?.campaigns ?? []).filter((c: any) => c.status === 'running');
   const activity = activityData?.activity ?? [];
+  const salesTrend = chartsData?.salesTrend ?? [];
+  const hasSalesData = salesTrend.some((d: any) => d.sales > 0 || d.enquiries > 0);
+  const channels = (chartsData?.channels ?? []).map((c: any) => ({
+    name: CHANNEL_META[c.key]?.name ?? c.key,
+    value: c.value,
+    color: CHANNEL_META[c.key]?.color ?? '#94a3b8',
+  }));
+  const channelTotal = channels.reduce((a: number, c: any) => a + c.value, 0);
+  const trends = chartsData?.trends;
 
   const agentTypeLabel: Record<string, string> = {
     cold_calling: 'Cold Calling', money_recovery: 'Money Recovery',
@@ -196,7 +201,7 @@ export const Dashboard: React.FC = () => {
               sub={`+${m?.new_leads_today ?? 0} today`}
               icon={<Users size={16} />}
               accent="#4ade80"
-              trend={{ value: 12, label: 'vs last month' }}
+              trend={trends ? { value: trends.leads, label: 'vs last month' } : undefined}
             />
             <MetricCard
               label="Active Campaigns"
@@ -211,7 +216,6 @@ export const Dashboard: React.FC = () => {
               sub={`${m?.pending_recovery ?? 0} cases`}
               icon={<IndianRupee size={16} />}
               accent="#fbbf24"
-              trend={{ value: -8, label: 'resolved' }}
             />
             <MetricCard
               label="Used Tractors"
@@ -226,7 +230,7 @@ export const Dashboard: React.FC = () => {
               sub={`${m?.conversion_rate ?? 0}% conversion`}
               icon={<TrendingUp size={16} />}
               accent="#34d399"
-              trend={{ value: 18, label: 'vs last month' }}
+              trend={trends ? { value: trends.sales, label: 'vs last month' } : undefined}
             />
           </div>
         </FadeUp>
@@ -245,8 +249,9 @@ export const Dashboard: React.FC = () => {
                   Live
                 </Badge>
               </div>
+              {hasSalesData ? (
               <ResponsiveContainer width="100%" height={156}>
-                <AreaChart data={salesData}>
+                <AreaChart data={salesTrend}>
                   <defs>
                     <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#4ade80" stopOpacity={0.25} />
@@ -264,37 +269,51 @@ export const Dashboard: React.FC = () => {
                   <Area type="monotone" dataKey="sales" name="Sales" stroke="#4ade80" strokeWidth={2} fill="url(#salesGrad)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="h-[156px] flex flex-col items-center justify-center text-center gap-1.5">
+                  <Activity size={20} className="text-[var(--text-muted)] opacity-40" />
+                  <p className="text-xs text-[var(--text-muted)]">No sales or enquiry data yet</p>
+                </div>
+              )}
             </Card>
 
             <Card>
               <h3 className="font-display font-semibold text-sm text-[var(--text-primary)] mb-0.5">Lead Sources</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mb-3">By channel this month</p>
+              <p className="text-[11px] text-[var(--text-muted)] mb-3">By conversation channel</p>
+              {channelTotal > 0 ? (
+                <>
               <ResponsiveContainer width="100%" height={128}>
                 <PieChart>
                   <Pie
-                    data={channelData}
+                    data={channels}
                     cx="50%" cy="50%"
                     innerRadius={38} outerRadius={56}
                     paddingAngle={3}
                     dataKey="value"
                     strokeWidth={0}
                   >
-                    {channelData.map((c, i) => <Cell key={i} fill={c.color} />)}
+                    {channels.map((c, i) => <Cell key={i} fill={c.color} />)}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 mt-1">
-                {channelData.map(c => (
+                {channels.map(c => (
                   <div key={c.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
                       <span className="text-xs text-[var(--text-secondary)]">{c.name}</span>
                     </div>
-                    <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{c.value}%</span>
+                    <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums">{Math.round((c.value / channelTotal) * 100)}%</span>
                   </div>
                 ))}
               </div>
+                </>
+              ) : (
+                <div className="h-[180px] flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-[var(--text-muted)]">No channel activity yet</p>
+                </div>
+              )}
             </Card>
           </div>
         </FadeUp>

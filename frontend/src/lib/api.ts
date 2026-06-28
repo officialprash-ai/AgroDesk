@@ -85,6 +85,7 @@ export const api = {
   dashboard: {
     metrics: (dealer_id: string) => req<any>(`/api/dashboard/metrics?dealer_id=${dealer_id}`),
     activity: (dealer_id: string, limit?: number) => req<{ activity: any[] }>(`/api/dashboard/activity?dealer_id=${dealer_id}${limit ? `&limit=${limit}` : ''}`),
+    charts: (dealer_id: string) => req<{ salesTrend: { month: string; sales: number; enquiries: number }[]; channels: { key: string; value: number }[]; weekly: { week: string; calls: number; whatsapp: number; sms: number; leads: number }[]; trends: { leads: number; sales: number } }>(`/api/dashboard/charts?dealer_id=${dealer_id}`),
   },
 
   documents: {

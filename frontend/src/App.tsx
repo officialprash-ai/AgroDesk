@@ -9,6 +9,9 @@ import { Header } from './components/layout/Header';
 import { Card, MetricCard } from './components/ui';
 import { TrendingUp, Users, Megaphone, IndianRupee } from 'lucide-react';
 import { useChartTheme } from './lib/useChartTheme';
+import { api } from './lib/api';
+import { useApi } from './lib/useApi';
+import { formatCurrency } from './lib/utils';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, CartesianGrid
@@ -65,24 +68,28 @@ const TOOLTIP_STYLE = { background: 'var(--tooltip-bg)', border: '1px solid var(
 
 const Analytics: React.FC = () => {
   const chart = useChartTheme();
-  const data = [
-    { week: 'W1', calls: 180, whatsapp: 320, sms: 150, leads: 42 },
-    { week: 'W2', calls: 220, whatsapp: 410, sms: 180, leads: 58 },
-    { week: 'W3', calls: 195, whatsapp: 380, sms: 160, leads: 51 },
-    { week: 'W4', calls: 260, whatsapp: 490, sms: 210, leads: 71 },
-  ];
+  const { dealer } = useAppStore();
+  const dealerId = dealer?.id ?? 'd1';
+  const { data: chartsData } = useApi(() => api.dashboard.charts(dealerId), [dealerId]);
+  const { data: metricsData } = useApi(() => api.dashboard.metrics(dealerId), [dealerId]);
+  const data = chartsData?.weekly ?? [];
+  const hasWeekly = data.some((d: any) => d.calls || d.whatsapp || d.sms || d.leads);
+  const totalOutreach = data.reduce((a: number, d: any) => a + d.calls + d.whatsapp + d.sms, 0);
+  const leadsGen = data.reduce((a: number, d: any) => a + d.leads, 0);
+  const m = metricsData;
   return (
     <div className="flex-1 overflow-auto">
-      <Header title="Analytics" subtitle="Performance across all agents — January 2024" />
+      <Header title="Analytics" subtitle="Performance across your agents — last 4 weeks" />
       <div className="p-6 space-y-6 page-enter">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total Outreach" value="4,820" sub="All channels" icon={<Megaphone size={16} />} accent="#4ade80" trend={{ value: 22, label: 'vs last month' }} />
-          <MetricCard label="Leads Generated" value="222" sub="From campaigns" icon={<Users size={16} />} accent="#60a5fa" />
-          <MetricCard label="Recovery Rate" value="68%" sub="₹8.4L collected" icon={<IndianRupee size={16} />} accent="#fbbf24" />
-          <MetricCard label="Conversion" value="18.4%" sub="Enquiry to sale" icon={<TrendingUp size={16} />} accent="#a78bfa" />
+          <MetricCard label="Total Outreach" value={totalOutreach.toLocaleString()} sub="All channels · 4 weeks" icon={<Megaphone size={16} />} accent="#4ade80" />
+          <MetricCard label="Leads Generated" value={leadsGen.toLocaleString()} sub="New contacts · 4 weeks" icon={<Users size={16} />} accent="#60a5fa" />
+          <MetricCard label="Recovery Due" value={formatCurrency(m?.recovery_amount ?? 0)} sub={`${m?.pending_recovery ?? 0} cases`} icon={<IndianRupee size={16} />} accent="#fbbf24" />
+          <MetricCard label="Conversion" value={`${m?.conversion_rate ?? 0}%`} sub="Enquiry to sale" icon={<TrendingUp size={16} />} accent="#a78bfa" />
         </div>
         <Card>
           <h3 className="font-display font-semibold text-sm text-[var(--text-primary)] mb-4">Weekly Outreach Performance</h3>
+          {hasWeekly ? (
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -94,9 +101,13 @@ const Analytics: React.FC = () => {
               <Bar dataKey="sms" name="SMS" fill="#fbbf24" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] flex items-center justify-center text-center text-xs text-[var(--text-muted)]">No outreach activity in the last 4 weeks</div>
+          )}
         </Card>
         <Card>
           <h3 className="font-display font-semibold text-sm text-[var(--text-primary)] mb-4">Weekly Lead Generation</h3>
+          {hasWeekly ? (
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={data}>
               <defs>
@@ -111,6 +122,9 @@ const Analytics: React.FC = () => {
               <Area type="monotone" dataKey="leads" name="Leads" stroke="#4ade80" strokeWidth={2} fill="url(#leadGrad)" />
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="h-[160px] flex items-center justify-center text-center text-xs text-[var(--text-muted)]">No lead data in the last 4 weeks</div>
+          )}
         </Card>
       </div>
     </div>
