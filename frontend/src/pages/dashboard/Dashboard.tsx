@@ -11,6 +11,7 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatCurrency, formatRelative } from '../../lib/utils';
+import { useChartTheme } from '../../lib/useChartTheme';
 import {
   Users, Megaphone, IndianRupee, Phone, Truck,
   ArrowRight, TrendingUp, Sparkles, CheckCircle, Activity,
@@ -63,6 +64,7 @@ const FadeUp: React.FC<{ delay?: number; children: React.ReactNode; className?: 
 export const Dashboard: React.FC = () => {
   const { dealer } = useAppStore();
   const dealerId = dealer?.id ?? 'd1';
+  const chart = useChartTheme();
 
   const { data: metricsData, loading: mLoading } = useApi(() => api.dashboard.metrics(dealerId), [dealerId]);
   const { data: contactsData } = useApi(() => api.contacts.list(dealerId, { limit: 10 }), [dealerId]);
@@ -254,8 +256,8 @@ export const Dashboard: React.FC = () => {
                       <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" tick={{ fontSize: 10.5, fill: 'rgba(240,253,244,0.35)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'rgba(240,253,244,0.35)' }} axisLine={false} tickLine={false} width={28} />
+                  <XAxis dataKey="month" tick={chart.tick} axisLine={false} tickLine={false} />
+                  <YAxis tick={chart.tickSm} axisLine={false} tickLine={false} width={28} />
                   <Tooltip content={<CustomTooltip />} />
                   <Area type="monotone" dataKey="enquiries" name="Enquiries" stroke="#60a5fa" strokeWidth={1.5} fill="url(#enquiryGrad)" dot={false} />
                   <Area type="monotone" dataKey="sales" name="Sales" stroke="#4ade80" strokeWidth={2} fill="url(#salesGrad)" dot={false} />

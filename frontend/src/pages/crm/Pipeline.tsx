@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
 import { Avatar } from '../../components/ui';
 import { api } from '../../lib/api';
@@ -27,11 +28,17 @@ export const Pipeline: React.FC = () => {
       <Header title="CRM · Pipeline" subtitle="Drag leads across stages · Maharashtra region" />
       <div className="p-6 ">
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {STAGES.map(stage => {
+          {STAGES.map((stage, si) => {
             const stageContacts = contacts.filter(c => c.lead_status === stage.id);
             const total = stageContacts.reduce((a, _) => a + 1, 0);
             return (
-              <div key={stage.id} className="flex-shrink-0 w-64">
+              <motion.div
+                key={stage.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: si * 0.06, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="flex-shrink-0 w-64"
+              >
                 {/* Column Header */}
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="flex items-center gap-2">
@@ -39,7 +46,7 @@ export const Pipeline: React.FC = () => {
                     <span className="text-xs font-semibold text-[var(--text-primary)]">{stage.label}</span>
                     <span className="text-xs px-1.5 py-0.5 rounded-full font-mono" style={{ background: stage.accent, color: stage.color }}>{total}</span>
                   </div>
-                  <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
+                  <button title={`Add lead to ${stage.label}`} aria-label={`Add lead to ${stage.label}`} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-lg hover:bg-[rgba(255,255,255,0.05)]">
                     <Plus size={13} />
                   </button>
                 </div>
@@ -69,13 +76,13 @@ export const Pipeline: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-[var(--text-muted)]">{c.last_contact ? formatRelative(c.last_contact) : 'No contact'}</span>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-1 rounded hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-muted)] hover:text-brand-400 transition-colors">
+                          <button title="Call" aria-label="Call" className="p-1 rounded hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-muted)] hover:text-brand-400 transition-colors">
                             <Phone size={10} />
                           </button>
-                          <button className="p-1 rounded hover:bg-[rgba(96,165,250,0.1)] text-[var(--text-muted)] hover:text-blue-400 transition-colors">
+                          <button title="WhatsApp" aria-label="WhatsApp" className="p-1 rounded hover:bg-[rgba(96,165,250,0.1)] text-[var(--text-muted)] hover:text-blue-400 transition-colors">
                             <MessageSquare size={10} />
                           </button>
-                          <button onClick={() => openScriptModal('follow_up', { contact: c })}
+                          <button onClick={() => openScriptModal('follow_up', { contact: c })} title="AI script" aria-label="AI script"
                             className="p-1 rounded hover:bg-[rgba(167,139,250,0.1)] text-[var(--text-muted)] hover:text-purple-400 transition-colors">
                             <Sparkles size={10} />
                           </button>
@@ -90,7 +97,7 @@ export const Pipeline: React.FC = () => {
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>

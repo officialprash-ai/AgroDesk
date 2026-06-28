@@ -554,8 +554,8 @@ export const ColdCalling: React.FC = () => {
               options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))} />
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setCrmModal({ open: false })}>Cancel</Button>
-              <Button icon={<UserPlus size={13} />} onClick={handleAddToCrm} disabled={crmLoading}>
-                {crmLoading ? 'Adding...' : 'Add to CRM Pipeline'}
+              <Button icon={<UserPlus size={13} />} onClick={handleAddToCrm} loading={crmLoading} disabled={crmLoading}>
+                Add to CRM Pipeline
               </Button>
             </div>
           </div>
@@ -603,7 +603,7 @@ export const ColdCalling: React.FC = () => {
               options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))} />
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setNewCampaignModal(false)}>Cancel</Button>
-              <Button onClick={handleNewCampaign} disabled={newCampaignLoading}>{newCampaignLoading ? 'Creating...' : 'Create Campaign'}</Button>
+              <Button onClick={handleNewCampaign} loading={newCampaignLoading} disabled={newCampaignLoading}>Create Campaign</Button>
             </div>
           </div>
         </Modal>

@@ -140,6 +140,8 @@ export const Sidebar: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              aria-label={item.label}
+              title={!sidebarOpen ? item.label : undefined}
               className={cn(
                 'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 border group',
                 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
@@ -147,6 +149,13 @@ export const Sidebar: React.FC = () => {
                 isActive && 'nav-active',
               )}
             >
+              {isActive && (
+                <motion.span
+                  layoutId="nav-active-rail"
+                  className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-brand-400"
+                  transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                />
+              )}
               {/* Hover bg */}
               {!isActive && (
                 <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-[rgba(255,255,255,0.04)]" />
@@ -231,6 +240,7 @@ export const Sidebar: React.FC = () => {
         <motion.button
           whileHover={{ x: sidebarOpen ? -2 : 2 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           onClick={toggleSidebar}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors',
@@ -241,6 +251,7 @@ export const Sidebar: React.FC = () => {
         </motion.button>
         <motion.button
           whileHover={{ x: 1 }}
+          aria-label="Sign out"
           onClick={clearAuth}
           className={cn(
             'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-muted)] hover:text-red-400 hover:bg-[rgba(239,68,68,0.06)] transition-colors',

@@ -85,7 +85,7 @@ function OutcomeModal({ open, onClose, onSave, channel, caseName }: {
         </div>
         <div className="flex gap-2 justify-end pt-1">
           <Button variant="ghost" size="sm" onClick={onClose}>Skip</Button>
-          <Button size="sm" onClick={save} disabled={loading || !outcome}>{loading ? 'Saving...' : 'Save Outcome'}</Button>
+          <Button size="sm" onClick={save} loading={loading} disabled={loading || !outcome}>Save Outcome</Button>
         </div>
       </div>
     </Modal>
@@ -401,7 +401,7 @@ export const MoneyRecovery: React.FC = () => {
             ]} value={form.escalation_stage} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm(f => ({ ...f, escalation_stage: e.target.value }))} />
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button onClick={handleAddCase} disabled={addLoading}>{addLoading ? 'Saving...' : 'Add Case'}</Button>
+              <Button onClick={handleAddCase} loading={addLoading} disabled={addLoading}>Add Case</Button>
             </div>
           </div>
         </Modal>

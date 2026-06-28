@@ -8,6 +8,7 @@ import { AIScriptModal } from './components/shared/AIScriptModal';
 import { Header } from './components/layout/Header';
 import { Card, MetricCard } from './components/ui';
 import { TrendingUp, Users, Megaphone, IndianRupee } from 'lucide-react';
+import { useChartTheme } from './lib/useChartTheme';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   BarChart, Bar, CartesianGrid
@@ -60,11 +61,10 @@ class ErrorBoundary extends React.Component<
 }
 
 // ─── Analytics (inline — recharts already in bundle) ─────────
-const TICK_STYLE = { fontSize: 11, fill: 'rgba(240,253,244,0.4)' };
-const TICK_STYLE_SM = { fontSize: 10, fill: 'rgba(240,253,244,0.4)' };
 const TOOLTIP_STYLE = { background: 'var(--tooltip-bg)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 };
 
 const Analytics: React.FC = () => {
+  const chart = useChartTheme();
   const data = [
     { week: 'W1', calls: 180, whatsapp: 320, sms: 150, leads: 42 },
     { week: 'W2', calls: 220, whatsapp: 410, sms: 180, leads: 58 },
@@ -85,9 +85,9 @@ const Analytics: React.FC = () => {
           <h3 className="font-display font-semibold text-sm text-[var(--text-primary)] mb-4">Weekly Outreach Performance</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="week" tick={TICK_STYLE} axisLine={false} tickLine={false} />
-              <YAxis tick={TICK_STYLE_SM} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="week" tick={chart.tick} axisLine={false} tickLine={false} />
+              <YAxis tick={chart.tickSm} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="calls" name="Voice Calls" fill="#60a5fa" radius={[4,4,0,0]} />
               <Bar dataKey="whatsapp" name="WhatsApp" fill="#4ade80" radius={[4,4,0,0]} />
@@ -105,8 +105,8 @@ const Analytics: React.FC = () => {
                   <stop offset="100%" stopColor="#4ade80" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="week" tick={TICK_STYLE} axisLine={false} tickLine={false} />
-              <YAxis tick={TICK_STYLE_SM} axisLine={false} tickLine={false} />
+              <XAxis dataKey="week" tick={chart.tick} axisLine={false} tickLine={false} />
+              <YAxis tick={chart.tickSm} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area type="monotone" dataKey="leads" name="Leads" stroke="#4ade80" strokeWidth={2} fill="url(#leadGrad)" />
             </AreaChart>

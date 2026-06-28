@@ -448,3 +448,63 @@ body {
 .color-orb::after { mask-image: radial-gradient(black 15%, transparent 75%); }
 @keyframes orb-spin { to { --angle: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .color-orb::before { animation: none; } }
+
+/* ─────────────────────────────────────────────
+   PREMIUM POLISH LAYER (v3.1)
+   ───────────────────────────────────────────── */
+
+/* ── Refined type rendering ── */
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv01', 'ss01';
+}
+.font-display, h1, h2, h3 { letter-spacing: -0.015em; }
+h1 { letter-spacing: -0.021em; }
+
+/* ── Keyboard focus ring (only shows for keyboard users) ── */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not(input):not(textarea):not(select):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-deep), 0 0 0 4px rgba(34, 197, 94, 0.55);
+  transition: box-shadow 0.12s ease;
+}
+[data-theme="light"] a:focus-visible,
+[data-theme="light"] button:focus-visible,
+[data-theme="light"] [role="button"]:focus-visible,
+[data-theme="light"] [tabindex]:not(input):not(textarea):not(select):focus-visible {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(22, 163, 74, 0.6);
+}
+
+/* ── Premium card hover sheen (opt-in via .ag-sheen) ── */
+.ag-sheen { position: relative; }
+.ag-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 38%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.ag-sheen:hover::after { opacity: 1; }
+[data-theme="light"] .ag-sheen::after {
+  background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, transparent 40%);
+}
+
+/* ── Count-up & number transitions feel crisper with tabular figures ── */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ── Honor reduced-motion for ALL css animations/transitions ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

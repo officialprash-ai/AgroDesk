@@ -494,8 +494,8 @@ export const UsedTractor: React.FC = () => {
             ]} value={form.condition} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm(f => ({ ...f, condition: e.target.value }))} />
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button icon={<Sparkles size={13} />} onClick={handleAddTractor} disabled={addLoading}>
-                {addLoading ? 'Saving...' : 'Save & Generate AI Listing'}
+              <Button icon={<Sparkles size={13} />} onClick={handleAddTractor} loading={addLoading} disabled={addLoading}>
+                Save & Generate AI Listing
               </Button>
             </div>
           </div>
@@ -523,7 +523,7 @@ export const UsedTractor: React.FC = () => {
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setEditModal({ open: false })}>Cancel</Button>
-              <Button onClick={saveEdit} disabled={editLoading}>{editLoading ? 'Saving...' : 'Save Changes'}</Button>
+              <Button onClick={saveEdit} loading={editLoading} disabled={editLoading}>Save Changes</Button>
             </div>
           </div>
         </Modal>
@@ -565,8 +565,8 @@ export const UsedTractor: React.FC = () => {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setPhotoModal({ open: false, photos: [] })}>Cancel</Button>
               {photoModal.photos.length > 0 && (
-                <Button onClick={savePhotos} disabled={photoUploading}>
-                  {photoUploading ? 'Saving...' : `Save ${photoModal.photos.length} Photo${photoModal.photos.length > 1 ? 's' : ''}`}
+                <Button onClick={savePhotos} loading={photoUploading} disabled={photoUploading}>
+                  {`Save ${photoModal.photos.length} Photo${photoModal.photos.length > 1 ? 's' : ''}`}
                 </Button>
               )}
             </div>

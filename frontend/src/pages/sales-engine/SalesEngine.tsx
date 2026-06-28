@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { Header } from '../../components/layout/Header';
-import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, ProgressBar, EmptyState } from '../../components/ui';
+import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, ProgressBar, EmptyState, CountUp } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
@@ -505,7 +505,7 @@ export const SalesEngine: React.FC = () => {
                       <span style={{ color: k.color }}>{k.icon}</span>
                       <p className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide">{k.label}</p>
                     </div>
-                    <p className="font-display font-bold text-xl text-[var(--text-primary)]">{k.value.toLocaleString()}</p>
+                    <p className="font-display font-bold text-xl text-[var(--text-primary)] tabular-nums"><CountUp value={k.value.toLocaleString()} /></p>
                   </div>
                 ))}
               </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Header } from '../../components/layout/Header';
-import { Card, Button, Badge, Avatar, SearchInput, TabBar, Modal, Input, Select } from '../../components/ui';
+import { Card, Button, Badge, Avatar, SearchInput, TabBar, Modal, Input, Select, CountUp } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
@@ -93,7 +93,7 @@ export const Contacts: React.FC = () => {
               transition={{ delay: i * 0.06, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             >
               <Card className="border-l-[3px] py-3" style={{ borderLeftColor: s.color } as React.CSSProperties}>
-                <p className="text-xl font-display font-bold animate-number-pop" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-xl font-display font-bold animate-number-pop tabular-nums" style={{ color: s.color }}><CountUp value={s.value} /></p>
                 <p className="text-xs text-[var(--text-muted)]">{s.label}</p>
               </Card>
             </motion.div>
@@ -247,7 +247,7 @@ export const Contacts: React.FC = () => {
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button onClick={handleSaveContact} disabled={addLoading}>{addLoading ? 'Saving...' : 'Save Contact'}</Button>
+              <Button onClick={handleSaveContact} loading={addLoading} disabled={addLoading}>Save Contact</Button>
             </div>
           </div>
         </Modal>

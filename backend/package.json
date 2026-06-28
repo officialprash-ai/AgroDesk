@@ -48,7 +48,7 @@
     "vitest": "^1.6.0"
   },
   "prisma": {
-    "seed": "ts-node --esm prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "allowScripts": {
     "@prisma/client@5.22.0": true,

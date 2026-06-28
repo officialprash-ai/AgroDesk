@@ -1,7 +1,52 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { X, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+
+// ─── COUNT UP ───
+// Animates the numeric portion of a value while preserving prefix/suffix
+// (e.g. "₹8.4L", "4,820", "68%"). Falls back to raw text if no number found,
+// and respects prefers-reduced-motion.
+export const CountUp: React.FC<{ value: string | number; duration?: number; className?: string }> = ({
+  value, duration = 750, className,
+}) => {
+  const raw = String(value);
+  const match = raw.match(/-?[\d,]*\.?\d+/);
+  const [display, setDisplay] = useState(raw);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!match) { setDisplay(raw); return; }
+    const numStr = match[0];
+    const target = parseFloat(numStr.replace(/,/g, ''));
+    if (!isFinite(target)) { setDisplay(raw); return; }
+
+    const prefix = raw.slice(0, match.index);
+    const suffix = raw.slice((match.index ?? 0) + numStr.length);
+    const decimals = numStr.includes('.') ? (numStr.split('.')[1]?.length ?? 0) : 0;
+    const hasComma = numStr.includes(',');
+    const fmt = (n: number) => {
+      const fixed = n.toFixed(decimals);
+      return hasComma ? Number(fixed).toLocaleString('en-IN') : fixed;
+    };
+
+    const reduce = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || target === 0) { setDisplay(prefix + fmt(target) + suffix); return; }
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(prefix + fmt(target * eased) + suffix);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [raw]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return <span className={className}>{display}</span>;
+};
 
 // ─── BUTTON ───────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -244,9 +289,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   label, value, sub, icon, accent = '#4ade80', trend,
 }) => (
   <motion.div
-    whileHover={{ y: -2, boxShadow: 'var(--shadow-md)' }}
+    whileHover={{ y: -3, boxShadow: 'var(--shadow-md)' }}
     transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-    className="glass rounded-2xl p-5 relative overflow-hidden"
+    className="ag-sheen glass rounded-2xl p-5 relative overflow-hidden"
     style={{ borderLeft: `3px solid ${accent}` }}
   >
     {/* Subtle accent glow in corner */}
@@ -261,13 +306,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           {label}
         </p>
         <motion.p
-          key={String(value)}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 24 }}
           className="font-display font-bold text-[1.6rem] leading-none text-[var(--text-primary)] tabular-nums"
         >
-          {value}
+          <CountUp value={value} />
         </motion.p>
         {sub && <p className="text-xs text-[var(--text-secondary)] mt-1.5">{sub}</p>}
         {trend && (
