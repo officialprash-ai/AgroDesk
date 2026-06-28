@@ -128,7 +128,8 @@ export const Dashboard: React.FC = () => {
   })();
 
   const randomQuip = greetingConfig.quips[Math.floor(Date.now() / 1000 / 3600) % greetingConfig.quips.length];
-  const subtitle = [`${greetingConfig.label}, ${dealer?.name ?? 'Dealer'}`, location].filter(Boolean).join(' · ');
+  // Header subtitle = today's date (greeting/name/location already shown in the banner below)
+  const subtitle = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="flex-1 overflow-auto">
