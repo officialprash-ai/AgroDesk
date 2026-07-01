@@ -1,15 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { resetDemoData, DEMO_DEALER_ID, DEMO_PHONE, DEMO_PASSWORD } from '../src/lib/demoSeed.js';
+import { TRACTOR_BRANDS } from '../src/lib/brands.js';
 
 const prisma = new PrismaClient();
-
-// Major tractor brands sold/serviced by Indian dealerships. Seeded once as a
-// shared reference catalog for the onboarding wizard's "brands you sell" step.
-const TRACTOR_BRANDS = [
-  'Mahindra', 'Swaraj', 'John Deere', 'Sonalika', 'Eicher', 'TAFE',
-  'Massey Ferguson', 'New Holland', 'Kubota', 'Force Motors', 'Farmtrac',
-  'Powertrac', 'Escorts', 'VST Shakti', 'Preet', 'Indo Farm', 'Captain',
-];
 
 async function main() {
   console.log('Seeding AgroDesk...');

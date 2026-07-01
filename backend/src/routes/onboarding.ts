@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma as _prisma } from '../lib/prisma.js';
 const prisma = _prisma as any;
 import type { AuthRequest } from '../middleware/auth.js';
+import { TRACTOR_BRANDS } from '../lib/brands.js';
 
 const router = Router();
 
@@ -26,7 +27,19 @@ async function bumpStep(dealer_id: string, step: number) {
 // GET /api/onboarding/brands — active brand catalog for the "brands you sell" step
 router.get('/brands', async (_req, res) => {
   try {
-    const brands = await prisma.brand.findMany({ where: { is_active: true }, orderBy: { name: 'asc' } });
+    let brands = await prisma.brand.findMany({ where: { is_active: true }, orderBy: { name: 'asc' } });
+
+    // Self-heal: if the catalog is empty (e.g. a fresh/production DB where the
+    // one-off `prisma db seed` was never run), seed it on first request instead
+    // of leaving new dealers stuck on a perpetual "Loading brand catalog…".
+    // Upserts are idempotent, so this is safe to hit concurrently or repeatedly.
+    if (brands.length === 0) {
+      await Promise.all(
+        TRACTOR_BRANDS.map(name => prisma.brand.upsert({ where: { name }, update: {}, create: { name } })),
+      );
+      brands = await prisma.brand.findMany({ where: { is_active: true }, orderBy: { name: 'asc' } });
+    }
+
     res.json({ brands });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load brand catalog' });
