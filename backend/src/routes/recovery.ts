@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { enqueueJob } from '../lib/queue.js';
 
 const router = Router();
 
@@ -69,20 +70,44 @@ router.patch('/:id', async (req, res) => {
 
 router.post('/:id/contact', async (req, res) => {
   try {
-    const { channel, outcome } = z.object({
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { channel, outcome, script } = z.object({
       channel: z.enum(['voice', 'whatsapp', 'sms', 'email']),
       outcome: z.string().default(''),
       script: z.string().optional(),
     }).parse(req.body);
     const existing = await prisma.recoveryCase.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ error: 'Case not found' });
+    if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
+
     const history = Array.isArray(existing.channel_history) ? (existing.channel_history as any[]) : [];
     const newEntry = { channel, outcome, date: new Date().toISOString() };
     const updated = await prisma.recoveryCase.update({
       where: { id: req.params.id },
       data: { channel_history: [...history, newEntry], last_contact: new Date(), updated_at: new Date() },
     });
-    res.json({ success: true, case: updated, queued: channel === 'voice' || channel === 'whatsapp' });
+
+    // For voice/whatsapp, actually dispatch a real job to the worker (legal stage still
+    // requires the explicit bulk-recovery exclusion + manual approval elsewhere).
+    let queued = false;
+    if (channel === 'voice' || channel === 'whatsapp') {
+      const job = await prisma.agentJob.create({
+        data: {
+          dealer_id,
+          agent_type: channel === 'voice' ? 'voice_call' : 'whatsapp',
+          payload: { case_id: existing.id, script, escalation_stage: existing.escalation_stage },
+          idempotency_key: `recovery-contact-${existing.id}-${channel}-${Date.now()}`,
+        },
+      });
+      await enqueueJob({
+        db_job_id: job.id,
+        dealer_id,
+        agent_type: channel === 'voice' ? 'voice_call' : 'whatsapp',
+        payload: { case_id: existing.id, script, escalation_stage: existing.escalation_stage },
+      }).catch(err => console.error('[recovery/contact] Failed to enqueue job:', err));
+      queued = true;
+    }
+
+    res.json({ success: true, case: updated, queued });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
     res.status(500).json({ error: 'Failed to log contact' });
@@ -99,16 +124,25 @@ router.post('/bulk', async (req, res) => {
       where: { dealer_id, status: 'active', escalation_stage: { not: 'legal' } },
     });
     const jobs = await Promise.all(
-      activeCases.map((c: { id: string; escalation_stage: string }) =>
-        prisma.agentJob.create({
+      activeCases.map(async (c: { id: string; escalation_stage: string }) => {
+        const job = await prisma.agentJob.create({
           data: {
             dealer_id,
             agent_type: 'money_recovery',
             payload: { case_id: c.id, channels, escalation_stage: c.escalation_stage },
             idempotency_key: `recovery-${c.id}-${Date.now()}`,
           },
-        })
-      )
+        });
+        // Actually push to the Bull queue so the worker picks it up — without this
+        // the row just sits in Postgres and no call/message ever goes out.
+        await enqueueJob({
+          db_job_id: job.id,
+          dealer_id,
+          agent_type: 'money_recovery',
+          payload: { case_id: c.id, channels, escalation_stage: c.escalation_stage },
+        }).catch(err => console.error('[recovery/bulk] Failed to enqueue job:', err));
+        return job;
+      })
     );
     res.json({ success: true, queued: jobs.length, cases: activeCases.length });
   } catch (err) {

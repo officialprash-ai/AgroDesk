@@ -6,13 +6,19 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatRelative, LANGUAGES } from '../../lib/utils';
-import { UserPlus, Phone, MessageSquare, Sparkles, Filter, Download, ChevronUp, ChevronDown } from 'lucide-react';
+import { UserPlus, Phone, MessageSquare, Sparkles, Filter, Download, ChevronUp, ChevronDown, Eye, Pencil } from 'lucide-react';
 
 const STAGE_TABS = [
   { id: 'all', label: 'All', count: 0 },
   { id: 'new', label: 'New' }, { id: 'contacted', label: 'Contacted' },
   { id: 'qualified', label: 'Qualified' }, { id: 'proposal', label: 'Proposal' },
   { id: 'won', label: 'Won' }, { id: 'lost', label: 'Lost' },
+];
+
+const LEAD_STAGE_OPTIONS = [
+  { value: 'new', label: 'New' }, { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' }, { value: 'proposal', label: 'Proposal' },
+  { value: 'won', label: 'Won' }, { value: 'lost', label: 'Lost' },
 ];
 
 export const Contacts: React.FC = () => {
@@ -29,6 +35,48 @@ export const Contacts: React.FC = () => {
     language: 'hi', lead_status: 'new',
     opt_in_whatsapp: true, opt_in_sms: true, opt_in_call: true,
   });
+
+  // View / Edit contact modal
+  const [activeContact, setActiveContact] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<any | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const openView = (c: any) => {
+    setActiveContact(c);
+    setEditForm({
+      name: c.name ?? '', phone: c.phone ?? '', village: c.village ?? '', district: c.district ?? '',
+      language: c.language ?? 'hi', lead_status: c.lead_status ?? 'new',
+      opt_in_whatsapp: !!c.opt_in_whatsapp, opt_in_sms: !!c.opt_in_sms, opt_in_call: !!c.opt_in_call,
+    });
+    setIsEditing(false);
+    setEditError(null);
+  };
+
+  const closeView = () => {
+    setActiveContact(null);
+    setIsEditing(false);
+    setEditForm(null);
+    setEditError(null);
+  };
+
+  const handleUpdateContact = async () => {
+    if (!activeContact || !editForm) return;
+    if (!editForm.name || !editForm.phone) { setEditError('Name and phone are required.'); return; }
+    setEditLoading(true);
+    setEditError(null);
+    try {
+      const { contact } = await api.contacts.update(activeContact.id, editForm);
+      setActiveContact(contact);
+      setIsEditing(false);
+      refetch();
+    } catch (e) {
+      console.error(e);
+      setEditError('Failed to save changes — please try again.');
+    }
+    setEditLoading(false);
+  };
 
   const handleSaveContact = async () => {
     if (!form.name || !form.phone) return;
@@ -156,10 +204,10 @@ export const Contacts: React.FC = () => {
                     transition={{ delay: Math.min(idx * 0.03, 0.3), duration: 0.22 }}
                   >
                     <td>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 cursor-pointer" onClick={() => openView(c)}>
                         <Avatar name={c.name} size={34} />
                         <div>
-                          <p className="font-medium text-sm text-[var(--text-primary)]">{c.name}</p>
+                          <p className="font-medium text-sm text-[var(--text-primary)] hover:underline">{c.name}</p>
                           <p className="text-xs text-[var(--text-muted)] font-mono">{c.phone}</p>
                         </div>
                       </div>
@@ -193,6 +241,10 @@ export const Contacts: React.FC = () => {
                     <td className="text-xs text-[var(--text-muted)]">{c.last_contact ? formatRelative(c.last_contact) : '—'}</td>
                     <td>
                       <div className="flex gap-1.5">
+                        <button onClick={() => openView(c)}
+                          className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.08)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" title="View contact">
+                          <Eye size={13} />
+                        </button>
                         <button className="p-1.5 rounded-lg hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-muted)] hover:text-brand-400 transition-colors" title="Call">
                           <Phone size={13} />
                         </button>
@@ -243,15 +295,3 @@ export const Contacts: React.FC = () => {
               </label>
               <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
                 <input type="checkbox" className="accent-brand-400" checked={form.opt_in_call} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_call: e.target.checked }))} /> Call opt-in
-              </label>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button onClick={handleSaveContact} loading={addLoading} disabled={addLoading}>Save Contact</Button>
-            </div>
-          </div>
-        </Modal>
-      </div>
-    </div>
-  );
-};

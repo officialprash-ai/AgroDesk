@@ -96,8 +96,11 @@ export const api = {
     },
     confirm: (id: string) => req<{ document: any; success: boolean }>(`/api/documents/${id}/confirm`, { method: 'PATCH' }),
     delete: (id: string) => req<{ success: boolean }>(`/api/documents/${id}`, { method: 'DELETE' }),
+    upload: (data: { category: string; period_month: string; filename?: string; file_base64?: string; mime_type?: string }) =>
+      req<{ document: any; success: boolean }>('/api/documents/upload', { method: 'POST', body: JSON.stringify(data) }),
     sendToAccountant: (data: { dealer_id: string; accountant_id: string; period_month: string }) => req<{ success: boolean; sent: number; to: string }>('/api/documents/send-to-accountant', { method: 'POST', body: JSON.stringify(data) }),
     accountants: (dealer_id: string) => req<{ accountants: any[] }>(`/api/documents/accountants?dealer_id=${dealer_id}`),
+    tallyExportUrl: (period_month: string) => `${BASE}/api/documents/tally-export?period_month=${period_month}`,
   },
 
   ai: {

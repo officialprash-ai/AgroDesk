@@ -155,7 +155,15 @@ async function handleVoiceCall(data: QueueJobData) {
     });
     if (!recoveryCase) throw new Error(`RecoveryCase ${data.payload.case_id} not found`);
     phone = recoveryCase.phone;
-    if (!script) throw new Error('No script provided in job payload');
+    // Fall back to an auto-generated recovery script if the caller didn't supply one
+    // (e.g. the per-case "Call" button in Money Recovery doesn't pass a script).
+    if (!script) {
+      script = buildRecoveryScript(
+        recoveryCase.customer_name,
+        recoveryCase.amount_due,
+        (data.payload.escalation_stage as string) ?? recoveryCase.escalation_stage,
+      );
+    }
   } else {
     throw new Error('Voice call job requires contact_id or case_id in payload');
   }
@@ -209,8 +217,8 @@ async function handleWhatsApp(data: QueueJobData) {
 
   let phone: string;
   let contactId: string | null = null;
-  const message = data.payload.message as string;
-  if (!message) throw new Error('No message provided in job payload');
+  // Accept either `message` (campaign/contact sends) or `script` (script-modal dispatches)
+  let message = (data.payload.message ?? data.payload.script) as string | undefined;
 
   if (data.payload.contact_id) {
     const contact = await prisma.contact.findUnique({
@@ -218,6 +226,7 @@ async function handleWhatsApp(data: QueueJobData) {
     });
     if (!contact) throw new Error(`Contact ${data.payload.contact_id} not found`);
     if (!contact.opt_in_whatsapp) throw new Error(`Contact ${contact.id} has not opted in to WhatsApp`);
+    if (!message) throw new Error('No message provided in job payload');
     phone = contact.phone;
     contactId = contact.id;
   } else if (data.payload.case_id) {
@@ -226,9 +235,18 @@ async function handleWhatsApp(data: QueueJobData) {
     });
     if (!recoveryCase) throw new Error(`RecoveryCase ${data.payload.case_id} not found`);
     phone = recoveryCase.phone;
+    // Fall back to an auto-generated recovery message if none was supplied
+    if (!message) {
+      message = buildRecoveryScript(
+        recoveryCase.customer_name,
+        recoveryCase.amount_due,
+        (data.payload.escalation_stage as string) ?? recoveryCase.escalation_stage,
+      );
+    }
   } else {
     throw new Error('WhatsApp job requires contact_id or case_id in payload');
   }
+  if (!message) throw new Error('No message provided in job payload');
 
   console.log(`[worker] Sending WhatsApp to ${phone}`);
   const { sid } = await sendWhatsApp(phone, message);
@@ -377,6 +395,60 @@ async function handleSMS(data: QueueJobData) {
   });
 }
 
+/**
+ * AI Accountant — notify the accountant that a period's bills are ready.
+ *
+ * Expected payload:
+ *   { accountant_id, period_month, document_ids: string[] }
+ *
+ * Sends a WhatsApp summary (accountants are business contacts, not consumer
+ * `Contact` rows, so no opt-in/quiet-hours gate applies here — this is a
+ * B2B business notification, not a TRAI-regulated consumer message).
+ */
+async function handleSendToAccountant(data: QueueJobData) {
+  const accountantId = data.payload.accountant_id as string;
+  const periodMonth  = data.payload.period_month as string;
+  const documentIds   = (data.payload.document_ids as string[]) ?? [];
+
+  if (!accountantId) throw new Error('send_to_accountant job requires accountant_id in payload');
+
+  const accountant = await prisma.accountant.findUnique({ where: { id: accountantId } });
+  if (!accountant) throw new Error(`Accountant ${accountantId} not found`);
+
+  const documents = documentIds.length
+    ? await prisma.document.findMany({ where: { id: { in: documentIds } } })
+    : [];
+
+  const byCategory = documents.reduce((acc: Record<string, number>, d: { category: string }) => {
+    acc[d.category] = (acc[d.category] ?? 0) + 1;
+    return acc;
+  }, {});
+  const summaryLines = Object.entries(byCategory).map(([cat, count]) => `- ${cat}: ${count} file(s)`).join('\n');
+
+  const dealer = await prisma.dealer.findUnique({ where: { id: data.dealer_id } });
+  const dealerName = dealer?.name ?? 'AgroDesk dealer';
+
+  const message = `Hello ${accountant.name},\n\n${dealerName} has sent ${documents.length} bill(s) for ${periodMonth} on AgroDesk:\n${summaryLines || '(no categorised documents)'}\n\nLog in to your AgroDesk accountant view or reply here to request the files.`;
+
+  console.log(`[worker] Notifying accountant ${accountant.name} (${accountant.phone}) — ${documents.length} docs for ${periodMonth}`);
+  try {
+    const { sid } = await sendWhatsApp(accountant.phone, message);
+    console.log(`[worker] Accountant notified via WhatsApp — SID: ${sid}`);
+  } catch (err) {
+    // WhatsApp isn't configured or the number can't receive — this is non-fatal for
+    // the job (documents are still marked as sent below); log so it's visible.
+    console.error(`[worker] Failed to WhatsApp-notify accountant ${accountant.id}:`, (err as Error).message);
+  }
+
+  // Mark documents as confirmed/sent so the History tab reflects the handoff
+  if (documentIds.length) {
+    await prisma.document.updateMany({
+      where: { id: { in: documentIds } },
+      data: { confirmed: true },
+    });
+  }
+}
+
 agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
   const { db_job_id, agent_type } = job.data;
   console.log(`[worker] Processing job ${db_job_id} (type: ${agent_type})`);
@@ -389,10 +461,11 @@ agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
 
   try {
     switch (agent_type) {
-      case 'voice_call':      await handleVoiceCall(job.data);      break;
-      case 'whatsapp':        await handleWhatsApp(job.data);        break;
-      case 'sms':             await handleSMS(job.data);             break;
-      case 'money_recovery':  await handleMoneyRecovery(job.data);   break;
+      case 'voice_call':        await handleVoiceCall(job.data);        break;
+      case 'whatsapp':          await handleWhatsApp(job.data);          break;
+      case 'sms':               await handleSMS(job.data);               break;
+      case 'money_recovery':    await handleMoneyRecovery(job.data);     break;
+      case 'send_to_accountant': await handleSendToAccountant(job.data); break;
       default:
         throw new Error(`Unknown agent_type: ${agent_type}`);
     }

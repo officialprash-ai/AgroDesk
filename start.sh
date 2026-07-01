@@ -11,18 +11,15 @@ if [ ! -f backend/.env ]; then
   echo ""
 fi
 
-# Terminal 1: Backend
+# Terminal 1: Backend API
 echo "Starting backend on :3001..."
 (cd backend && npm run dev) &
 
-# Terminal 2: Frontend
-echo "Starting frontend on :5173..."
-(cd frontend && npm run dev) &
+# Terminal 2: Agent worker (places real calls/WhatsApp/SMS — without this,
+# jobs queue up in Postgres/Redis but nothing ever actually goes out)
+echo "Starting agent worker..."
+(cd backend && npm run dev:worker) &
 
-echo ""
-echo "✅ AgroDesk running:"
-echo "   Frontend: http://localhost:5173"
-echo "   API:      http://localhost:3001/api/health"
-echo ""
-echo "Press Ctrl+C to stop both services"
-wait
+# Terminal 3: Frontend
+echo "Starting frontend on :5173..."
+(c

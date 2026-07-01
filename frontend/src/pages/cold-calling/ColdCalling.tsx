@@ -107,6 +107,7 @@ export const ColdCalling: React.FC = () => {
   const [uploadLang, setUploadLang] = useState('mr');
   const [uploadPreview, setUploadPreview] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
 
 
   const [crmModal, setCrmModal] = useState<{ open: boolean; call?: Call }>({ open: false });
@@ -174,17 +175,42 @@ export const ColdCalling: React.FC = () => {
   const handleUploadStart = async () => {
     setUploadLoading(true);
     try {
-      const newCalls: Call[] = uploadPreview.map((c, i) => ({
-        ...c,
-        id: Date.now() + i,
-        status: 'pending',
-        duration: 0,
-        score: 0,
-        time: '—',
-        note: c.note ?? '',
-        language: uploadLang,
-      }));
+      // Dedupe against contacts already loaded from the CRM (by normalised phone)
+      const existingPhones = new Set(calls.map(c => c.phone.replace(/\D/g, '').slice(-10)));
+      const rowsToCreate = uploadPreview.filter(c => !existingPhones.has(c.phone.replace(/\D/g, '').slice(-10)));
+
+      // Persist real Contact rows so they're dispatchable (id, opt_in_call reflect
+      // the consent checkbox the dealer just confirmed) — CSV-only rows previously
+      // never became real contacts, so "Call" could never place a real AI call.
+      const created = await Promise.all(
+        rowsToCreate.map(c =>
+          api.contacts.create({
+            name: c.name,
+            phone: c.phone,
+            language: uploadLang,
+            lead_status: 'new',
+            tags: ['cold_call'],
+            opt_in_call: consentConfirmed,
+          }).catch(() => null)
+        )
+      );
+
+      const newCalls: Call[] = created.map((res, i) => {
+        const c = rowsToCreate[i];
+        return {
+          id: res?.contact?.id ?? Date.now() + i,
+          name: c.name,
+          phone: c.phone,
+          status: 'pending',
+          duration: 0,
+          score: 0,
+          time: '—',
+          note: c.note ?? '',
+          language: uploadLang,
+        };
+      });
       setCalls(prev => [...prev, ...newCalls]);
+
       await api.campaigns.create({
         dealer_id: dealerId,
         name: campaignName,
@@ -195,9 +221,14 @@ export const ColdCalling: React.FC = () => {
       });
       setShowUpload(false);
       setUploadPreview([]);
+      setConsentConfirmed(false);
       setRunning(true);
       setLiveTimer(0);
-      showToast(`${newCalls.length} contacts loaded — campaign started!`);
+      showToast(
+        consentConfirmed
+          ? `${newCalls.length} contacts saved — ready for real AI calls`
+          : `${newCalls.length} contacts saved (no consent confirmed — calls will queue but the worker will skip them until opted in)`
+      );
     } catch {
       showToast('Failed to start campaign', 'error');
     }
@@ -261,7 +292,7 @@ export const ColdCalling: React.FC = () => {
   };
 
   const handleCallRow = (call: Call) => {
-    openScriptModal('cold_call_new', { contact: { name: call.name, phone: call.phone, language: call.language } });
+    openScriptModal('cold_call_new', { contact: { id: call.id, name: call.name, phone: call.phone, language: call.language } });
     setCalls(prev => prev.map(c => c.id === call.id ? { ...c, status: 'in_progress', time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) } : c));
     setRunning(true);
     setLiveTimer(0);
@@ -523,12 +554,20 @@ export const ColdCalling: React.FC = () => {
 
             <div className="p-3 rounded-xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)] space-y-1.5">
               <p className="text-xs font-medium text-[var(--text-primary)]">Auto-actions after upload:</p>
-              {['DLT/DND scrub (TRAI compliant)', 'Deduplicate against existing CRM', 'AI calls in selected language', 'Interested leads auto-added to CRM pipeline'].map(item => (
+              {['Deduplicate against existing CRM', 'Saved as real contacts (dispatchable for AI calls)', 'AI calls in selected language', 'Interested leads auto-added to CRM pipeline'].map(item => (
                 <p key={item} className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
                   <CheckCircle size={10} className="text-brand-400 flex-shrink-0" />{item}
                 </p>
               ))}
             </div>
+
+            <label className="flex items-start gap-2 p-3 rounded-xl border border-[var(--border)] cursor-pointer">
+              <input type="checkbox" className="accent-brand-400 mt-0.5" checked={consentConfirmed}
+                onChange={e => setConsentConfirmed(e.target.checked)} />
+              <span className="text-xs text-[var(--text-secondary)]">
+                I confirm these contacts have consented to being called (TRAI/DND compliant). Without this, contacts are saved but the AI voice worker will skip them until opt-in is recorded.
+              </span>
+            </label>
 
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => { setShowUpload(false); setUploadPreview([]); }}>Cancel</Button>

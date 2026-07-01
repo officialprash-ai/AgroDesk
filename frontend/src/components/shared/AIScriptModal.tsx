@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Modal, Button, Select } from '../ui';
 import { useAppStore } from '../../store';
-import { Sparkles, Copy, RefreshCw, Check, Mic, Pencil, Save, X } from 'lucide-react';
+import { Sparkles, Copy, RefreshCw, Check, Mic, Pencil, Save, X, Phone, MessageSquare } from 'lucide-react';
 import { LANGUAGES } from '../../lib/utils';
+import { api } from '../../lib/api';
 
 const SCRIPT_TYPES = [
   { value: 'cold_call_new', label: 'Cold Call – New Tractor' },
@@ -16,8 +17,15 @@ const SCRIPT_TYPES = [
   { value: 'inbound_response', label: 'Inbound Enquiry Response' },
 ];
 
+// A dealer-created DB row has a Prisma cuid id (starts with 'c', 25 chars, no
+// leading digits-only). CSV-parsed rows not yet saved to CRM use `Date.now()+i`
+// as a placeholder id — those can't be dispatched as real jobs yet.
+function isRealId(id: unknown): id is string {
+  return typeof id === 'string' && !/^\d+$/.test(id);
+}
+
 export const AIScriptModal: React.FC = () => {
-  const { scriptModal, closeScriptModal } = useAppStore();
+  const { scriptModal, closeScriptModal, dealer } = useAppStore();
   const [lang, setLang] = useState('mr');
   const [scriptType, setScriptType] = useState(scriptModal.type || 'cold_call_new');
   const [script, setScript] = useState('');
@@ -26,6 +34,36 @@ export const AIScriptModal: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState('');
   const [voiceLoading, setVoiceLoading] = useState(false);
+  const [dispatching, setDispatching] = useState<'voice' | 'whatsapp' | null>(null);
+  const [dispatchMsg, setDispatchMsg] = useState<string | null>(null);
+
+  const ctx = scriptModal.context ?? {};
+  const contact = (ctx as any).contact;
+  const recoveryCase = (ctx as any).case;
+  const contactId = isRealId(contact?.id) ? contact.id as string : null;
+  const caseId = isRealId(recoveryCase?.id) ? recoveryCase.id as string : null;
+  const canDispatch = Boolean(contactId || caseId);
+
+  const dispatchJob = async (channel: 'voice' | 'whatsapp') => {
+    const text = editing ? editDraft : script;
+    if (!text || !dealer?.id) return;
+    setDispatching(channel);
+    setDispatchMsg(null);
+    try {
+      const payload: Record<string, unknown> = contactId
+        ? { contact_id: contactId, script: text, message: text }
+        : { case_id: caseId, script: text, message: text };
+      await api.jobs.create({
+        agent_type: channel === 'voice' ? 'voice_call' : 'whatsapp',
+        payload,
+        dealer_id: dealer.id,
+      });
+      setDispatchMsg(channel === 'voice' ? 'Call queued — AI will dial shortly.' : 'WhatsApp message queued for delivery.');
+    } catch (e: any) {
+      setDispatchMsg(e?.message ?? 'Failed to queue — check provider setup in Settings.');
+    }
+    setDispatching(null);
+  };
 
   const generateScript = async () => {
     setLoading(true);
@@ -164,6 +202,28 @@ export const AIScriptModal: React.FC = () => {
                 </Button>
               )}
             </div>
+
+            {/* Real dispatch — actually places the call / sends the WhatsApp message */}
+            {canDispatch ? (
+              <div className="mt-3 p-3 rounded-xl bg-[rgba(74,222,128,0.05)] border border-[var(--border)] space-y-2">
+                <p className="text-xs font-medium text-[var(--text-primary)]">
+                  Send this to {contact?.name ?? recoveryCase?.customer_name ?? 'the contact'} now:
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" icon={<Phone size={12} />} onClick={() => dispatchJob('voice')} loading={dispatching === 'voice'} disabled={dispatching !== null}>
+                    Call Now (AI Voice)
+                  </Button>
+                  <Button size="sm" variant="secondary" icon={<MessageSquare size={12} />} onClick={() => dispatchJob('whatsapp')} loading={dispatching === 'whatsapp'} disabled={dispatching !== null}>
+                    Send WhatsApp Now
+                  </Button>
+                </div>
+                {dispatchMsg && <p className="text-xs text-brand-400">{dispatchMsg}</p>}
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--text-muted)] mt-2">
+                Add this person to your CRM contacts to enable one-click real call/WhatsApp dispatch.
+              </p>
+            )}
 
             {/* Word count */}
             <p className="text-[10px] text-[var(--text-muted)] mt-2">

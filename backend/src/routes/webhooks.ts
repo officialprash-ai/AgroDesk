@@ -2,9 +2,73 @@ import { Router } from 'express';
 import { prisma as _prisma } from '../lib/prisma.js';
 const prisma = _prisma as any;
 import Anthropic from '@anthropic-ai/sdk';
+import { sendWhatsApp } from '../lib/whatsapp.js';
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const LANG_NAMES: Record<string, string> = { mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali' };
+
+/**
+ * Generate and send the AI Salesman's auto-reply for an inbound WhatsApp message.
+ * This is what actually closes the loop for Module E — previously inbound messages
+ * were logged/labelled but the customer never got a reply.
+ */
+async function autoRespondWhatsApp(dealerId: string, contactId: string | null, fromPhone: string, inboundText: string, language: string) {
+  try {
+    let history = '';
+    if (contactId) {
+      const past = await prisma.conversation.findMany({
+        where: { contact_id: contactId, dealer_id: dealerId },
+        orderBy: { created_at: 'desc' },
+        take: 10,
+      });
+      if (past.length > 0) {
+        history = '\n\nPrevious interactions with this customer (most recent first):\n' +
+          past.map((c: any) => `[${c.channel.toUpperCase()} · ${c.direction === 'inbound' ? 'Customer' : 'Agent'}]: ${c.content}`).join('\n');
+      }
+    }
+
+    const langName = LANG_NAMES[language] ?? 'Marathi';
+    const systemPrompt = `You are AgroDesk AI Salesman for a tractor dealership in Maharashtra, India.
+You help farmers with tractor enquiries, pricing, EMI information, and booking visits.
+Respond in ${langName}. Be helpful, warm, and knowledgeable about tractors and farm equipment.
+Keep responses concise (2-4 sentences). Use Indian currency (₹).
+Never make up prices — say you'll check and confirm.
+Scope: tractor sales only. Escalate complex legal/financial questions to human agent.${history}`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: inboundText }],
+    });
+    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    if (!reply) return;
+
+    const { sid } = await sendWhatsApp(fromPhone, reply);
+
+    await prisma.conversation.create({
+      data: {
+        dealer_id: dealerId,
+        contact_id: contactId ?? '',
+        channel: 'whatsapp',
+        direction: 'outbound',
+        content: reply,
+        status: 'sent',
+        twilio_sid: sid,
+      },
+    }).catch(() => {/* non-fatal */});
+
+    if (contactId) {
+      await prisma.contact.update({ where: { id: contactId }, data: { last_contact: new Date() } }).catch(() => {});
+    }
+  } catch (err) {
+    // Non-fatal: the inbound message is already logged even if the auto-reply fails
+    // (e.g. WhatsApp/Twilio credentials not configured yet).
+    console.error('[webhook/whatsapp] auto-reply failed:', (err as Error).message);
+  }
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,9 +163,15 @@ router.post('/whatsapp', async (req, res) => {
 
     console.log(`[webhook/whatsapp] ${labels.intent}/${labels.sentiment} from ${fromPhone} → conv ${conv.id}`);
 
-    // Reply with empty TwiML (agent responds separately via campaign)
+    // Respond to Twilio immediately so the webhook doesn't time out, then fire the
+    // AI Salesman auto-reply in the background. Escalated/complaint intents still get
+    // an acknowledgement but a human should follow up — the dashboard flags these.
     res.setHeader('Content-Type', 'text/xml');
     res.status(200).send('<Response/>');
+
+    autoRespondWhatsApp(dealer.id, contact?.id ?? null, fromPhone, Body ?? '', contact?.language ?? dealer.language ?? 'mr')
+      .catch(err => console.error('[webhook/whatsapp] auto-respond error:', err));
+    return;
   } catch (err) {
     console.error('[webhook/whatsapp]', err);
     res.status(200).send('<Response/>'); // always 200 to Twilio

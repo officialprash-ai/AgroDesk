@@ -46,6 +46,9 @@ export const AIAccountant: React.FC = () => {
   const [sendLoading, setSendLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [accForm, setAccForm] = useState({ name: '', phone: '', email: '', tally_enabled: false, is_default: false });
+  const [pendingFile, setPendingFile] = useState<{ base64: string; mime: string; name: string } | null>(null);
+  const [tallyExporting, setTallyExporting] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const currentStep = MONTH_STEPS[step];
   const isLastStep = step === MONTH_STEPS.length - 1;
@@ -57,35 +60,66 @@ export const AIAccountant: React.FC = () => {
   const pendingOcr = docs.filter(d => d.file_url && !d.ocr_data).length;
 
   // ── Handlers ──────────────────────────────────────────────────
+  const readFileAsBase64 = (file: File): Promise<{ base64: string; mime: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const [, base64] = result.split(',');
+        resolve({ base64, mime: file.type || 'application/octet-stream' });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleFilePicked = async (file: File | undefined) => {
+    if (!file) return;
+    const { base64, mime } = await readFileAsBase64(file);
+    setPendingFile({ base64, mime, name: file.name });
+  };
+
   const handleUpload = async (skip = false) => {
-    // Simulate upload: create a document record in DB
     if (!skip) {
       try {
-        await api.documents.list(dealerId, CURRENT_PERIOD); // ensure we have latest
-        // In real impl, file upload to S3 first, then create doc with file_url
-        // For MVP: create doc record with placeholder
-        await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:3001'}/api/documents`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${JSON.parse(localStorage.getItem('agrodesk-auth') ?? '{}')?.state?.token ?? ''}`,
-          },
-          body: JSON.stringify({
-            dealer_id: dealerId,
-            category: currentStep.key,
-            period_month: CURRENT_PERIOD,
-            filename: `${currentStep.key}.pdf`,
-            file_url: `/uploads/${dealerId}/${currentStep.key}-${Date.now()}.pdf`,
-          }),
+        await api.documents.upload({
+          category: currentStep.key,
+          period_month: CURRENT_PERIOD,
+          filename: pendingFile?.name ?? `${currentStep.key}.jpg`,
+          file_base64: pendingFile?.base64,
+          mime_type: pendingFile?.mime,
         });
         refetchDocs();
       } catch (e) {
-        console.error('Doc create failed:', e);
+        console.error('Doc upload failed:', e);
       }
     }
-    setUploaded(prev => ({ ...prev, [currentStep.key]: { files: skip ? [] : ['invoice.pdf'], skipped: skip } }));
+    setUploaded(prev => ({ ...prev, [currentStep.key]: { files: skip ? [] : [pendingFile?.name ?? 'invoice'], skipped: skip } }));
+    setPendingFile(null);
     if (!isLastStep) setStep(s => s + 1);
     else setShowSendModal(true);
+  };
+
+  const handleTallyExport = async () => {
+    setTallyExporting(true);
+    try {
+      const token = JSON.parse(localStorage.getItem('agrodesk-auth') ?? '{}')?.state?.token ?? '';
+      const res = await fetch(api.documents.tallyExportUrl(CURRENT_PERIOD), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agrodesk-tally-${CURRENT_PERIOD}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+      refetchDocs();
+    } catch (e) {
+      console.error('Tally export failed:', e);
+      alert('No confirmed documents to export yet for this period, or export failed.');
+    }
+    setTallyExporting(false);
   };
 
   const handleSend = async () => {
@@ -224,7 +258,16 @@ export const AIAccountant: React.FC = () => {
                       <td className="text-[var(--text-secondary)] text-xs">{d.filename ?? '—'}</td>
                       <td>{d.ocr_data ? <Badge variant="active">Done</Badge> : <Badge variant="pending">Pending</Badge>}</td>
                       <td>{d.tally_synced ? <Badge variant="active">Synced</Badge> : <Badge variant="info">No</Badge>}</td>
-                      <td><Badge variant={d.confirmed ? 'active' : 'pending'}>{d.confirmed ? 'Confirmed' : 'Unconfirmed'}</Badge></td>
+                      <td>
+                        {d.confirmed ? <Badge variant="active">Confirmed</Badge> : (
+                          <button
+                            className="text-xs px-2 py-1 rounded-lg bg-[rgba(74,222,128,0.08)] text-brand-400 hover:bg-[rgba(74,222,128,0.15)] transition-colors"
+                            onClick={async () => { await api.documents.confirm(d.id); refetchDocs(); }}
+                          >
+                            Confirm
+                          </button>
+                        )}
+                      </td>
                       <td>
                         <button
                           aria-label="Delete document"
@@ -300,16 +343,20 @@ export const AIAccountant: React.FC = () => {
                 ))}
               </div>
               <div className="flex gap-2 mt-4">
-                <Button icon={<CheckCircle size={13} />}>Download Connector</Button>
+                <Button icon={<Send size={13} />} onClick={handleTallyExport} loading={tallyExporting} disabled={tallyExporting}>
+                  {tallyExporting ? 'Generating…' : `Export ${CURRENT_PERIOD} XML`}
+                </Button>
                 <Button variant="secondary">View Setup Guide</Button>
               </div>
+              <p className="text-xs text-[var(--text-muted)] mt-2">
+                Exports confirmed bills for {CURRENT_PERIOD} as a Tally-importable XML file — import via Gateway of Tally → Import Data → Vouchers → XML.
+              </p>
             </Card>
             <Card>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Non-Tally Dealers</h3>
-              <p className="text-xs text-[var(--text-secondary)] mb-3">Bills are packaged as a structured ZIP/PDF and sent directly to your accountant via WhatsApp or Email.</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-3">Bills are sent directly to your accountant via WhatsApp using the "Send Bills" action in the Accountants tab.</p>
               <div className="flex gap-2">
-                <Button variant="secondary" icon={<Send size={13} />}>Send to Accountant (WhatsApp)</Button>
-                <Button variant="ghost" icon={<Mail size={13} />}>Email Package</Button>
+                <Button variant="secondary" icon={<Send size={13} />} onClick={() => setTab('accountants')}>Go to Accountants</Button>
               </div>
             </Card>
           </div>
@@ -339,15 +386,19 @@ export const AIAccountant: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3">
+                <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
+                  onChange={e => { handleFilePicked(e.target.files?.[0]); e.target.value = ''; }} />
                 <div role="button" tabIndex={0} aria-label="Upload or scan a bill"
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleUpload(false); } }}
-                  className="h-28 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50" onClick={() => handleUpload(false)}>
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+                  className="h-28 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-brand-400/40 transition-colors flex flex-col items-center justify-center cursor-pointer bg-[rgba(255,255,255,0.02)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/50" onClick={() => fileInputRef.current?.click()}>
                   <Camera size={20} className="text-[var(--text-muted)] mb-2" />
-                  <p className="text-sm text-[var(--text-secondary)]">Scan from phone camera</p>
-                  <p className="text-xs text-[var(--text-muted)]">or upload PDF/image</p>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    {pendingFile ? `${pendingFile.name} ready — AI will OCR on upload` : 'Scan from phone camera'}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">{pendingFile ? 'Tap Upload File to continue' : 'or upload PDF/image'}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1 justify-center" icon={<Upload size={13} />} onClick={() => handleUpload(false)}>Upload File</Button>
+                  <Button className="flex-1 justify-center" icon={<Upload size={13} />} onClick={() => handleUpload(false)} disabled={!pendingFile}>Upload File</Button>
                   <Button variant="ghost" className="flex-1 justify-center" onClick={() => handleUpload(true)}>Skip — Not Available</Button>
                 </div>
               </div>
