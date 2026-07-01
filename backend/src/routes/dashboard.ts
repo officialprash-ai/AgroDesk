@@ -61,8 +61,11 @@ router.get('/metrics', async (req, res) => {
 
 router.get('/activity', async (req, res) => {
   try {
-    const { dealer_id, limit = '20' } = req.query as Record<string, string>;
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    // dealer_id must come from the verified JWT (authMiddleware), never from the
+    // query string — a client-supplied value here let any dealer read another
+    // dealer's agent job activity feed by passing ?dealer_id=<victim>.
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const { limit = '20' } = req.query as Record<string, string>;
     const jobs = await prisma.agentJob.findMany({
       where: { dealer_id },
       orderBy: { created_at: 'desc' },
@@ -76,8 +79,8 @@ router.get('/activity', async (req, res) => {
 
 router.get('/charts', async (req, res) => {
   try {
-    const dealer_id = (req as AuthRequest).dealer_id ?? (req.query.dealer_id as string);
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    // dealer_id must come from the verified JWT only — no query-string fallback.
+    const dealer_id = (req as AuthRequest).dealer_id!;
 
     const now = new Date();
     const monthStart = (y: number, m: number) => new Date(y, m, 1);
@@ -140,8 +143,10 @@ router.get('/charts', async (req, res) => {
 
 router.delete('/activity', async (req, res) => {
   try {
-    const dealer_id = (req as AuthRequest).dealer_id ?? (req.query.dealer_id as string);
-    if (!dealer_id) return res.status(400).json({ error: 'dealer_id required' });
+    // dealer_id must come from the verified JWT only — no query-string fallback.
+    // This route deletes rows, so trusting a client value here would let one
+    // dealer wipe another dealer's queued/failed job history.
+    const dealer_id = (req as AuthRequest).dealer_id!;
     const result = await prisma.agentJob.deleteMany({
       where: { dealer_id, status: { in: ['pending', 'queued', 'failed'] } },
     });
