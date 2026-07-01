@@ -3,8 +3,22 @@ import { resetDemoData, DEMO_DEALER_ID, DEMO_PHONE, DEMO_PASSWORD } from '../src
 
 const prisma = new PrismaClient();
 
+// Major tractor brands sold/serviced by Indian dealerships. Seeded once as a
+// shared reference catalog for the onboarding wizard's "brands you sell" step.
+const TRACTOR_BRANDS = [
+  'Mahindra', 'Swaraj', 'John Deere', 'Sonalika', 'Eicher', 'TAFE',
+  'Massey Ferguson', 'New Holland', 'Kubota', 'Force Motors', 'Farmtrac',
+  'Powertrac', 'Escorts', 'VST Shakti', 'Preet', 'Indo Farm', 'Captain',
+];
+
 async function main() {
   console.log('Seeding AgroDesk...');
+
+  // Brand catalog
+  const brands = await Promise.all(
+    TRACTOR_BRANDS.map(name => prisma.brand.upsert({ where: { name }, update: {}, create: { name } })),
+  );
+  console.log('Brands:', brands.length);
 
   // Create demo dealer
   const dealer = await prisma.dealer.upsert({
@@ -20,6 +34,10 @@ async function main() {
       email: 'rajesh@example.com',
       language: 'mr',
       plan: 'growth',
+      business_type: 'both',
+      onboarding_status: 'active',
+      onboarding_step: 4,
+      brand_ids: brands.filter(b => ['Mahindra', 'Sonalika', 'John Deere'].includes(b.name)).map(b => b.id),
     },
   });
   console.log('Dealer:', dealer.name);

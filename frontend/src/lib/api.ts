@@ -57,7 +57,14 @@ export const api = {
   campaigns: {
     list: (dealer_id: string) => req<{ campaigns: any[]; total: number }>(`/api/campaigns?dealer_id=${dealer_id}`),
     create: (data: Record<string, unknown>) => req<{ campaign: any; success: boolean }>('/api/campaigns', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Record<string, unknown>) => req<{ campaign: any; success: boolean }>(`/api/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     setStatus: (id: string, status: string) => req<{ campaign: any; success: boolean }>(`/api/campaigns/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    delete: (id: string) => req<{ success: boolean }>(`/api/campaigns/${id}`, { method: 'DELETE' }),
+    contacts: {
+      list: (id: string) => req<{ contacts: any[]; total: number }>(`/api/campaigns/${id}/contacts`),
+      add: (id: string, contact_ids: string[]) => req<{ campaign: any; added: number; success: boolean }>(`/api/campaigns/${id}/contacts`, { method: 'POST', body: JSON.stringify({ contact_ids }) }),
+      remove: (id: string, contact_id: string) => req<{ campaign: any; success: boolean }>(`/api/campaigns/${id}/contacts/${contact_id}`, { method: 'DELETE' }),
+    },
   },
 
   recovery: {
@@ -130,5 +137,14 @@ export const api = {
       req<{ job: any; success: boolean }>('/api/jobs', { method: 'POST', body: JSON.stringify(data) }),
     list: (dealer_id: string) =>
       req<{ jobs: any[]; total: number }>(`/api/jobs?dealer_id=${dealer_id}`),
+  },
+
+  onboarding: {
+    brands: () => req<{ brands: { id: string; name: string; category: string }[] }>('/api/onboarding/brands'),
+    status: () => req<{ dealer: any; checklist: { profile: boolean; brands: boolean; plan: boolean }; complete: boolean }>('/api/onboarding/status'),
+    saveProfile: (data: Record<string, unknown>) => req<{ dealer: any; success: boolean }>('/api/onboarding/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+    saveBrands: (brand_ids: string[]) => req<{ dealer: any; success: boolean }>('/api/onboarding/brands', { method: 'PATCH', body: JSON.stringify({ brand_ids }) }),
+    savePlan: (plan: string) => req<{ dealer: any; success: boolean }>('/api/onboarding/plan', { method: 'PATCH', body: JSON.stringify({ plan }) }),
+    complete: () => req<{ dealer: any; success: boolean }>('/api/onboarding/complete', { method: 'POST' }),
   },
 };

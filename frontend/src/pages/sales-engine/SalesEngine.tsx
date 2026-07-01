@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { Header } from '../../components/layout/Header';
-import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, ProgressBar, EmptyState, CountUp } from '../../components/ui';
+import { Card, Button, Badge, MetricCard, TabBar, Modal, Input, Select, SearchInput, ProgressBar, EmptyState, CountUp } from '../../components/ui';
 import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
@@ -10,9 +10,103 @@ import { LANGUAGES } from '../../lib/utils';
 import {
   Megaphone, Plus, Play, Pause, Wand2, Phone, MessageSquare, Mail,
   Users, BarChart2, Target, Zap, Copy, Check, RefreshCw, Upload,
-  Clock, Calendar, Send, TrendingUp, Eye, Edit3,
+  Clock, Calendar, Send, TrendingUp, Eye, Edit3, X, UserPlus, Trash2,
   FileText, AlertCircle, CheckCircle2,
 } from 'lucide-react';
+
+// ── Contact picker (search existing CRM contacts or quick-add a new one) ──────
+
+interface PickedContact { id: string; name: string; phone: string }
+
+const ContactPicker: React.FC<{
+  dealerId: string;
+  attached: PickedContact[];
+  onAdd: (c: PickedContact) => void;
+  onRemove: (id: string) => void;
+  busy?: boolean;
+}> = ({ dealerId, attached, onAdd, onRemove, busy }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<PickedContact[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickPhone, setQuickPhone] = useState('');
+  const [quickLoading, setQuickLoading] = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await api.contacts.list(dealerId, { search: query, limit: 8 });
+        if (!cancelled) setResults((res.contacts as PickedContact[]).filter(c => !attached.some(a => a.id === c.id)));
+      } catch { if (!cancelled) setResults([]); }
+      if (!cancelled) setSearching(false);
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, dealerId, attached]);
+
+  const quickAdd = async () => {
+    if (!quickName || !quickPhone) return;
+    setQuickLoading(true);
+    try {
+      const res = await api.contacts.create({ dealer_id: dealerId, name: quickName, phone: quickPhone, language: 'hi', lead_status: 'new' });
+      onAdd(res.contact as PickedContact);
+      setQuickName(''); setQuickPhone(''); setShowQuickAdd(false); setQuery('');
+    } catch (e) { console.error(e); }
+    setQuickLoading(false);
+  };
+
+  return (
+    <div className="space-y-3">
+      {attached.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {attached.map(c => (
+            <span key={c.id} className="flex items-center gap-1.5 text-xs pl-2.5 pr-1.5 py-1 rounded-full bg-[rgba(74,222,128,0.08)] border border-[rgba(74,222,128,0.2)] text-brand-400">
+              {c.name}
+              <button type="button" disabled={busy} onClick={() => onRemove(c.id)} className="hover:text-red-400 transition-colors disabled:opacity-50">
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <SearchInput value={query} onChange={setQuery} placeholder="Search contacts by name or phone…" />
+
+      {searching && <p className="text-xs text-[var(--text-muted)]">Searching…</p>}
+      {results.length > 0 && (
+        <div className="border border-[var(--border)] rounded-xl divide-y divide-[var(--border)] max-h-40 overflow-y-auto">
+          {results.map(c => (
+            <button key={c.id} type="button" disabled={busy} onClick={() => { onAdd(c); setQuery(''); setResults([]); }}
+              className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[rgba(255,255,255,0.03)] transition-colors disabled:opacity-50">
+              <span className="text-xs text-[var(--text-primary)]">{c.name} <span className="text-[var(--text-muted)] font-mono">{c.phone}</span></span>
+              <Plus size={12} className="text-brand-400" />
+            </button>
+          ))}
+        </div>
+      )}
+      {query.trim() && !searching && results.length === 0 && (
+        <p className="text-xs text-[var(--text-muted)]">No matching contacts — add a new one below.</p>
+      )}
+
+      {!showQuickAdd ? (
+        <button type="button" onClick={() => setShowQuickAdd(true)}
+          className="text-xs text-brand-400 hover:underline flex items-center gap-1">
+          <UserPlus size={12} />Add a single new contact
+        </button>
+      ) : (
+        <div className="flex gap-2 items-end flex-wrap">
+          <div className="flex-1 min-w-[120px]"><Input label="Name" value={quickName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuickName(e.target.value)} /></div>
+          <div className="flex-1 min-w-[120px]"><Input label="Phone" value={quickPhone} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuickPhone(e.target.value)} /></div>
+          <Button size="sm" onClick={quickAdd} loading={quickLoading} disabled={!quickName || !quickPhone}>Add</Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowQuickAdd(false)}>Cancel</Button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,8 +187,21 @@ export const SalesEngine: React.FC = () => {
   const [showScript,  setShowScript]  = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showEdit,    setShowEdit]    = useState(false);
+  const [showManage,  setShowManage]  = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Record<string, unknown> | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<typeof MOCK_TEMPLATES[0] | null>(null);
+
+  // manage campaign (edit details + contacts) state
+  const [manageForm, setManageForm] = useState({ name: '', goal: '', language: 'hi' });
+  const [manageChannels, setManageChannels] = useState<string[]>([]);
+  const [manageContacts, setManageContacts] = useState<PickedContact[]>([]);
+  const [manageContactsLoading, setManageContactsLoading] = useState(false);
+  const [manageContactBusy, setManageContactBusy] = useState(false);
+  const [manageSaving, setManageSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // contacts staged for a brand-new campaign, attached right after it's created
+  const [pendingContacts, setPendingContacts] = useState<PickedContact[]>([]);
 
   // script state
   const [scriptChannel, setScriptChannel] = useState('whatsapp');
@@ -169,17 +276,102 @@ export const SalesEngine: React.FC = () => {
     if (!campForm.name) return;
     setCampLoading(true);
     try {
-      await api.campaigns.create({
+      const res = await api.campaigns.create({
         dealer_id: dealerId, name: campForm.name, goal: campForm.goal,
         channels: selectedChannels, language: campForm.language,
+        total_contacts: pendingContacts.length,
       });
+      if (pendingContacts.length > 0 && res.campaign?.id) {
+        await api.campaigns.contacts.add(res.campaign.id, pendingContacts.map(c => c.id)).catch(() => {});
+      }
       setShowNew(false);
       setCampForm({ name: '', goal: '', language: 'hi', startDate: '', endDate: '' });
       setSelectedChannels(['whatsapp']);
       setCsvFile(null);
+      setPendingContacts([]);
       refetch();
     } catch (e) { console.error(e); }
     setCampLoading(false);
+  };
+
+  // ── manage campaign (edit + contacts) ──────────────────────────────────────
+
+  const openManage = async (c: Record<string, unknown>) => {
+    setSelectedCampaign(c);
+    setManageForm({ name: String(c.name ?? ''), goal: String(c.goal ?? ''), language: String(c.language ?? 'hi') });
+    setManageChannels(Array.isArray(c.channels) ? c.channels.map(String) : []);
+    setDeleteConfirm(false);
+    setShowManage(true);
+    setManageContactsLoading(true);
+    try {
+      const res = await api.campaigns.contacts.list(String(c.id));
+      setManageContacts(res.contacts as PickedContact[]);
+    } catch { setManageContacts([]); }
+    setManageContactsLoading(false);
+  };
+
+  const saveManageDetails = async () => {
+    if (!selectedCampaign) return;
+    setManageSaving(true);
+    try {
+      const res = await api.campaigns.update(String(selectedCampaign.id), { ...manageForm, channels: manageChannels });
+      setSelectedCampaign(res.campaign);
+      refetch();
+    } catch (e) { console.error(e); }
+    setManageSaving(false);
+  };
+
+  const addManageContact = async (c: PickedContact) => {
+    if (!selectedCampaign) return;
+    setManageContactBusy(true);
+    try {
+      await api.campaigns.contacts.add(String(selectedCampaign.id), [c.id]);
+      setManageContacts(prev => prev.some(x => x.id === c.id) ? prev : [c, ...prev]);
+      refetch();
+    } catch (e) { console.error(e); }
+    setManageContactBusy(false);
+  };
+
+  const removeManageContact = async (contactId: string) => {
+    if (!selectedCampaign) return;
+    setManageContactBusy(true);
+    try {
+      await api.campaigns.contacts.remove(String(selectedCampaign.id), contactId);
+      setManageContacts(prev => prev.filter(c => c.id !== contactId));
+      refetch();
+    } catch (e) { console.error(e); }
+    setManageContactBusy(false);
+  };
+
+  const handleDeleteCampaign = async () => {
+    if (!selectedCampaign) return;
+    setManageSaving(true);
+    try {
+      await api.campaigns.delete(String(selectedCampaign.id));
+      setShowManage(false);
+      refetch();
+    } catch (e) { console.error(e); }
+    setManageSaving(false);
+  };
+
+  const scriptFieldForChannel = (channel: string): 'script_voice' | 'script_whatsapp' | 'script_sms' | null => {
+    if (channel === 'voice') return 'script_voice';
+    if (channel === 'whatsapp') return 'script_whatsapp';
+    if (channel === 'sms') return 'script_sms';
+    return null;
+  };
+
+  const saveScript = async () => {
+    if (!selectedCampaign) { setShowScript(false); return; }
+    const field = scriptFieldForChannel(scriptChannel);
+    if (!field) { setShowScript(false); return; }
+    setScriptLoading(true);
+    try {
+      await api.campaigns.update(String(selectedCampaign.id), { [field]: scriptText });
+      refetch();
+    } catch (e) { console.error(e); }
+    setScriptLoading(false);
+    setShowScript(false);
   };
 
   const openTemplatePreview = (t: typeof MOCK_TEMPLATES[0]) => { setSelectedTemplate(t); setShowPreview(true); };
@@ -305,6 +497,7 @@ export const SalesEngine: React.FC = () => {
                       </Button>
                       <Button variant="ghost" size="sm" icon={<BarChart2 size={12} />} onClick={() => openStats(c)}>Stats</Button>
                       <Button variant="ghost" size="sm" icon={<Wand2 size={12} />} onClick={() => openScript(c)}>Script</Button>
+                      <Button variant="ghost" size="sm" icon={<Edit3 size={12} />} onClick={() => openManage(c)}>Edit</Button>
                     </div>
                   </Card>
                   </motion.div>
@@ -464,6 +657,17 @@ export const SalesEngine: React.FC = () => {
             </label>
           </div>
 
+          {/* Add contacts individually */}
+          <div>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">Or add contacts individually</label>
+            <ContactPicker
+              dealerId={dealerId}
+              attached={pendingContacts}
+              onAdd={c => setPendingContacts(prev => prev.some(x => x.id === c.id) ? prev : [...prev, c])}
+              onRemove={id => setPendingContacts(prev => prev.filter(c => c.id !== id))}
+            />
+          </div>
+
           {/* AI hint */}
           <div className="flex items-center gap-2 p-3 rounded-xl bg-[rgba(74,222,128,0.04)] border border-[var(--border)]">
             <Wand2 size={12} className="text-brand-400 flex-shrink-0" />
@@ -471,7 +675,7 @@ export const SalesEngine: React.FC = () => {
           </div>
 
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" onClick={() => setShowNew(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setShowNew(false); setPendingContacts([]); }}>Cancel</Button>
             <Button icon={<Plus size={13} />} onClick={handleCreateCampaign} loading={campLoading} disabled={!campForm.name}>
               Create Campaign
             </Button>
@@ -604,8 +808,74 @@ export const SalesEngine: React.FC = () => {
                 <Button variant="ghost" size="sm" icon={scriptCopied ? <Check size={12} /> : <Copy size={12} />} onClick={copyScript}>
                   {scriptCopied ? 'Copied!' : 'Copy'}
                 </Button>
-                <Button size="sm" icon={<FileText size={12} />} onClick={() => setShowScript(false)}>Save Script</Button>
+                <Button size="sm" icon={<FileText size={12} />} onClick={saveScript} loading={scriptLoading}>Save Script</Button>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Manage Campaign Modal — edit details + contacts on an existing (incl. running) campaign */}
+      <Modal open={showManage && !!selectedCampaign} onClose={() => setShowManage(false)} title="Manage Campaign" size="lg">
+        {selectedCampaign && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <Badge variant={selectedCampaign.status === 'running' ? 'active' : selectedCampaign.status === 'paused' ? 'pending' : 'info'}>
+                {String(selectedCampaign.status)}
+              </Badge>
+              <p className="text-xs text-[var(--text-muted)]">Changes save immediately and apply to the next send — no need to pause first.</p>
+            </div>
+
+            {/* Details */}
+            <div className="space-y-3">
+              <Input label="Campaign Name" value={manageForm.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManageForm(f => ({ ...f, name: e.target.value }))} />
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Goal</label>
+                <textarea value={manageForm.goal} rows={2} className="ag-input resize-none w-full text-sm"
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setManageForm(f => ({ ...f, goal: e.target.value }))} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">Channels</label>
+                <div className="flex gap-2 flex-wrap">
+                  {Object.keys(CHANNEL_ICONS).map(ch => (
+                    <button key={ch} type="button" onClick={() => setManageChannels(prev => prev.includes(ch) ? prev.filter(c => c !== ch) : [...prev, ch])}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${manageChannels.includes(ch) ? 'border-brand-400 bg-[rgba(74,222,128,0.1)] text-brand-400' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-bright)]'}`}>
+                      {CHANNEL_ICONS[ch]}{ch}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Select label="Language" options={LANGUAGES.map(l => ({ value: l.code, label: `${l.label} (${l.english})` }))}
+                value={manageForm.language} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setManageForm(f => ({ ...f, language: e.target.value }))} />
+              <div className="flex justify-end">
+                <Button size="sm" icon={<Check size={12} />} loading={manageSaving} onClick={saveManageDetails}>Save Details</Button>
+              </div>
+            </div>
+
+            {/* Contacts */}
+            <div className="pt-4 border-t border-[var(--border)] space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-[var(--text-secondary)]">Contacts ({manageContacts.length})</label>
+                {manageContactsLoading && <RefreshCw size={12} className="animate-spin text-[var(--text-muted)]" />}
+              </div>
+              <ContactPicker dealerId={dealerId} attached={manageContacts} onAdd={addManageContact} onRemove={removeManageContact} busy={manageContactBusy} />
+            </div>
+
+            {/* Danger zone */}
+            <div className="pt-4 border-t border-[var(--border)] flex items-center justify-between">
+              {!deleteConfirm ? (
+                <button type="button" onClick={() => setDeleteConfirm(true)}
+                  className="text-xs text-red-400/70 hover:text-red-400 flex items-center gap-1 transition-colors">
+                  <Trash2 size={12} />Delete campaign
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-red-400">Delete this campaign permanently?</p>
+                  <Button variant="danger" size="sm" loading={manageSaving} onClick={handleDeleteCampaign}>Yes, delete</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+                </div>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setShowManage(false)}>Close</Button>
             </div>
           </div>
         )}

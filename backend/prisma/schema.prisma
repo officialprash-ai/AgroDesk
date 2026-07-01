@@ -25,6 +25,14 @@ model Dealer {
   created_at    DateTime @default(now())
   updated_at   DateTime @updatedAt
 
+  // ─── Org onboarding / setup ────────────────────────────────
+  brand_ids         String[] @default([])   // Brand.id values this dealer sells (new + used)
+  business_type     String?                 // authorized_dealer | reseller | both
+  onboarding_status String   @default("active") // draft (mid-setup) | active (setup complete)
+  onboarding_step   Int      @default(0)    // last wizard step completed, for resuming
+  gst_verified      Boolean  @default(false)
+  logo_url          String?
+
   contacts     Contact[]
   campaigns    Campaign[]
   tractors     UsedTractor[]
@@ -33,6 +41,18 @@ model Dealer {
   accountants  Accountant[]
   agent_jobs   AgentJob[]
   @@map("dealers")
+}
+
+// Tractor brand catalog — shared reference list used by the onboarding wizard
+// and (eventually) inventory/listing forms. Not dealer-scoped.
+model Brand {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  category   String   @default("tractor") // tractor | implement
+  logo_url   String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  @@map("brands")
 }
 
 model Contact {
@@ -58,6 +78,7 @@ model Contact {
   dealer            Dealer    @relation(fields: [dealer_id], references: [id])
   consents          Consent[]
   conversations     Conversation[]
+  campaigns         CampaignContact[]
   @@map("contacts")
 }
 
@@ -103,7 +124,23 @@ model Campaign {
   updated_at      DateTime @updatedAt
 
   dealer          Dealer   @relation(fields: [dealer_id], references: [id])
+  contacts        CampaignContact[]
   @@map("campaigns")
+}
+
+// Individual contacts explicitly attached to a campaign (single-add or CSV import),
+// as opposed to total_contacts which is just the aggregate counter shown in the UI.
+model CampaignContact {
+  id          String   @id @default(cuid())
+  campaign_id String
+  contact_id  String
+  created_at  DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  contact     Contact  @relation(fields: [contact_id], references: [id], onDelete: Cascade)
+  @@unique([campaign_id, contact_id])
+  @@index([campaign_id])
+  @@map("campaign_contacts")
 }
 
 model RecoveryCase {

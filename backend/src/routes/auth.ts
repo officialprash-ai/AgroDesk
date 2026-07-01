@@ -45,6 +45,8 @@ router.post('/login', async (req, res) => {
         id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
         phone: dealer.phone, email: dealer.email, language: dealer.language,
         plan: dealer.plan, is_demo: dealer.is_demo,
+        brand_ids: dealer.brand_ids, business_type: dealer.business_type,
+        onboarding_status: dealer.onboarding_status, onboarding_step: dealer.onboarding_step,
       },
     });
   } catch (err) {
@@ -70,7 +72,7 @@ router.post('/register', async (req, res) => {
 
     const password_hash = await bcrypt.hash(password, 10);
     const dealer = await prisma.dealer.create({
-      data: { name, phone, city, district, password_hash },
+      data: { name, phone, city, district, password_hash, onboarding_status: 'draft', onboarding_step: 0 },
     });
 
     const token = jwt.sign(
@@ -81,7 +83,11 @@ router.post('/register', async (req, res) => {
 
     return res.status(201).json({
       token,
-      dealer: { id: dealer.id, name: dealer.name, city: dealer.city, phone: dealer.phone, plan: dealer.plan },
+      dealer: {
+        id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district, phone: dealer.phone,
+        plan: dealer.plan, brand_ids: dealer.brand_ids, business_type: dealer.business_type,
+        onboarding_status: dealer.onboarding_status, onboarding_step: dealer.onboarding_step,
+      },
     });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
@@ -136,6 +142,8 @@ router.post('/google', async (req, res) => {
         id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
         phone: dealer.phone, email: dealer.email, language: dealer.language,
         plan: dealer.plan, is_demo: dealer.is_demo,
+        brand_ids: dealer.brand_ids, business_type: dealer.business_type,
+        onboarding_status: dealer.onboarding_status, onboarding_step: dealer.onboarding_step,
       },
     });
   } catch (err) {
@@ -158,6 +166,8 @@ router.get('/me', async (req, res) => {
         id: dealer.id, name: dealer.name, city: dealer.city, district: dealer.district,
         phone: dealer.phone, email: dealer.email, language: dealer.language,
         plan: dealer.plan, is_demo: dealer.is_demo,
+        brand_ids: dealer.brand_ids, business_type: dealer.business_type,
+        onboarding_status: dealer.onboarding_status, onboarding_step: dealer.onboarding_step,
       },
     });
   } catch {

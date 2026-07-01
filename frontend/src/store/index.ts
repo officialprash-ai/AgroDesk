@@ -49,6 +49,10 @@ interface DealerProfile {
   phone?: string;
   plan?: string;
   is_demo?: boolean;
+  brand_ids?: string[];
+  business_type?: string | null;
+  onboarding_status?: string;
+  onboarding_step?: number;
 }
 
 interface AppStore {
@@ -58,6 +62,7 @@ interface AppStore {
   setAuth: (token: string, dealer: DealerProfile) => void;
   clearAuth: () => void;
   setLanguage: (language: string) => void;
+  updateDealer: (patch: Partial<DealerProfile>) => void;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -125,6 +130,7 @@ export const useAppStore = create<AppStore>()(
       setAuth: (token, dealer) => set({ token, dealer }),
       clearAuth: () => set({ token: null, dealer: null }),
       setLanguage: (language) => set((s) => ({ dealer: s.dealer ? { ...s.dealer, language } : s.dealer })),
+      updateDealer: (patch) => set((s) => ({ dealer: s.dealer ? { ...s.dealer, ...patch } : s.dealer })),
       sidebarOpen: true,
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       contacts: [],

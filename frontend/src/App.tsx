@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MotionConfig } from 'motion/react';
 import { Login } from './pages/auth/Login';
+import { Onboarding } from './pages/onboarding/Onboarding';
 import { useAppStore } from './store';
 import { Sidebar } from './components/layout/Sidebar';
 import { AIScriptModal } from './components/shared/AIScriptModal';
@@ -165,13 +166,14 @@ const RoutedErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 function App() {
-  const { token, theme } = useAppStore();
+  const { token, dealer, theme } = useAppStore();
 
   React.useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme ?? 'dark');
   }, [theme]);
 
   if (!token) return <Login />;
+  if (dealer?.onboarding_status === 'draft') return <Onboarding />;
 
   return (
     <MotionConfig reducedMotion="user">

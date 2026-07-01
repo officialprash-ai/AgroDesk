@@ -28,6 +28,7 @@ import documentsRouter from './routes/documents.js';
 import authRouter from './routes/auth.js';
 import webhooksRouter from './routes/webhooks.js';
 import conversationsRouter from './routes/conversations.js';
+import onboardingRouter from './routes/onboarding.js';
 import { authMiddleware } from './middleware/auth.js';
 import type { AuthRequest } from './middleware/auth.js';
 import { demoGuard } from './middleware/demoGuard.js';
@@ -183,6 +184,7 @@ app.use('/api/tractors', authMiddleware, demoGuard, tractorsRouter);
 app.use('/api/dashboard', authMiddleware, demoGuard, dashboardRouter);
 app.use('/api/documents', authMiddleware, demoGuard, documentsRouter);
 app.use('/api/conversations', authMiddleware, conversationsRouter);
+app.use('/api/onboarding', authMiddleware, onboardingRouter);
 
 // ─── WEBHOOKS (Twilio-signed, no JWT) ───────────────────────
 app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
