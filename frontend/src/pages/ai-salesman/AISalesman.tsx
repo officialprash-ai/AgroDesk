@@ -11,7 +11,6 @@ import {
   RefreshCw, Sparkles, UserCheck, Settings2,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { MorphPanel } from '../../components/ui/MorphPanel';
 import { useAppStore as useStore } from '../../store';
 
 // ── PDF text extraction ───────────────────────────────────────────────────────
@@ -179,25 +178,6 @@ export const AISalesman: React.FC = () => {
     const sysMsg: ChatMessage = { role: 'system', text: '✅ Marked as resolved', time: TIME() };
     setChatMap(prev => ({ ...prev, [selectedId]: [...(prev[selectedId] ?? []), sysMsg] }));
     toast('Conversation resolved');
-  };
-
-  // AI Draft → fill input box
-  const handleAIDraft = async (prompt: string) => {
-    setAiTyping(true);
-    try {
-      const history = chatMessages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }));
-      const res = await api.ai.respond(
-        `Draft a sales reply for: ${prompt}`,
-        history,
-        selectedConv?.lang ?? 'en'
-      );
-      setInputMsg(res.reply ?? '');
-      inputRef.current?.focus();
-      toast('AI draft ready — review and send', 'info');
-    } catch {
-      toast('AI draft failed', 'error');
-    }
-    setAiTyping(false);
   };
 
   // Fetch conversations from API
@@ -375,6 +355,12 @@ export const AISalesman: React.FC = () => {
             </Card>
 
             {/* Right: chat view */}
+            {!selectedConv ? (
+              <Card className="lg:col-span-2 p-0 flex flex-col items-center justify-center gap-3 overflow-hidden">
+                <MessageSquare size={36} className="text-[var(--text-muted)] opacity-30" />
+                <p className="text-sm text-[var(--text-muted)]">Select a conversation to view messages</p>
+              </Card>
+            ) : (
             <Card className="lg:col-span-2 p-0 flex flex-col overflow-hidden">
               {/* Chat header */}
               <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
@@ -439,19 +425,14 @@ export const AISalesman: React.FC = () => {
               </div>
 
               {/* Input area */}
-              <div className="p-4 border-t border-[var(--border)] space-y-2">
-                <MorphPanel
-                  label="AI Draft"
-                  placeholder="Describe what to draft, e.g. 'EMI reply in Marathi'…"
-                  onSubmit={handleAIDraft}
-                />
+              <div className="p-4 border-t border-[var(--border)]">
                 <div className="flex items-end gap-2">
                   <input
                     ref={inputRef}
                     value={inputMsg}
                     onChange={e => setInputMsg(e.target.value)}
                     onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                    placeholder="Type a message or use AI Draft above…"
+                    placeholder="Type a message…"
                     className="ag-input flex-1 py-2 text-sm"
                     disabled={aiTyping}
                   />
@@ -459,6 +440,7 @@ export const AISalesman: React.FC = () => {
                 </div>
               </div>
             </Card>
+            )}
           </div>
         )}
 

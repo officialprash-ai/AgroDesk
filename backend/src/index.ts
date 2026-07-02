@@ -190,7 +190,11 @@ app.use('/api/onboarding', authMiddleware, onboardingRouter);
 app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: 30_000, // fail after 30s instead of the SDK's 10-min default (prevents "spins forever")
+  maxRetries: 1,
+});
 
 app.post('/api/ai/script', authMiddleware, aiLimiter, async (req, res) => {
   const { type, language, context } = req.body;
@@ -285,7 +289,11 @@ Requirements:
 
     res.json({ description });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate listing' });
+    console.error('AI listing error:', err);
+    res.status(500).json({
+      error: 'Failed to generate listing',
+      detail: process.env.NODE_ENV === 'development' ? String((err as Error)?.message ?? err) : undefined,
+    });
   }
 });
 
@@ -352,7 +360,11 @@ If the customer has interacted before (see history below), acknowledge continuit
 
     res.json({ reply, language });
   } catch (err) {
-    res.status(500).json({ error: 'AI response failed' });
+    console.error('AI respond error:', err);
+    res.status(500).json({
+      error: 'AI response failed',
+      detail: process.env.NODE_ENV === 'development' ? String((err as Error)?.message ?? err) : undefined,
+    });
   }
 });
 
