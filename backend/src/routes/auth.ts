@@ -188,7 +188,7 @@ router.patch('/profile', async (req, res) => {
       district: z.string().optional(),
       gst_number: z.string().optional(),
       phone: z.string().optional(),
-      email: z.string().email().optional(),
+      email: z.union([z.string().email(), z.literal('')]).optional(),
       language: z.string().optional(),
     }).parse(req.body);
 
