@@ -248,3 +248,34 @@ model Conversation {
   @@index([twilio_sid])
   @@map("conversations")
 }
+
+// ─── Ops (Vault) console: persisted admin accounts + audit trail ───
+// Previously in-memory in agrodesk Ops--backend/src/routes/admin.ts (wiped on restart).
+model AdminUser {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password_hash String
+  role          String    @default("viewer") // superadmin | admin | viewer
+  totp_secret   String?
+  totp_enabled  Boolean   @default(false)
+  last_login    DateTime?
+  last_ip       String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+
+  @@map("admin_users")
+}
+
+model AuditLog {
+  id       Int      @id @default(autoincrement())
+  ts       DateTime @default(now())
+  user     String
+  ip       String
+  action   String
+  resource String
+  detail   String
+  severity String   @default("info")
+
+  @@index([ts])
+  @@map("audit_log")
+}
