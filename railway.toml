@@ -1,7 +1,10 @@
+# AgroDesk MAIN API service.
+# The agent worker runs as a SEPARATE Railway service — see railway.worker.toml.
 [build]
 builder = "nixpacks"
 buildCommand = "cd backend && npm install --include=dev && npm run build"
 
 [deploy]
+startCommand = "cd backend && npm run start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

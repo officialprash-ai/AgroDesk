@@ -1,0 +1,28 @@
+# AgroDesk AGENT WORKER service (Railway "Config as Code").
+#
+# The worker drains the Redis job queue and performs all real outbound actions:
+# Exotel voice calls, Sarvam TTS, MSG91 SMS, and Twilio WhatsApp. Without this
+# service running, the API queues jobs but nothing is ever sent.
+#
+# SETUP (one-time, in the Railway dashboard):
+#   1. In the same project, create a NEW service ("+ New" → "GitHub Repo" →
+#      pick this same repo).
+#   2. Open that service → Settings → "Config-as-code" and set the config path to
+#      `railway.worker.toml` (this file). This overrides the default railway.toml.
+#   3. Give it the SAME environment variables as the main API service — at minimum:
+#      DATABASE_URL, REDIS_URL, ANTHROPIC_API_KEY, EXOTEL_API_KEY, EXOTEL_API_TOKEN,
+#      EXOTEL_SID, EXOTEL_PHONE, EXOTEL_WEBHOOK_TOKEN, SARVAM_API_KEY, MSG91_AUTH_KEY,
+#      MSG91_SENDER_ID, Twilio WhatsApp creds, NODE_ENV=production.
+#      (Use Railway "Shared Variables" / reference variables so they stay in sync.)
+#   4. Point REDIS_URL and DATABASE_URL at the SAME Redis and Postgres the API uses.
+#
+# The worker does NOT run migrations — the main API owns `prisma migrate deploy`.
+
+[build]
+builder = "nixpacks"
+buildCommand = "cd backend && npm install --include=dev && npm run build"
+
+[deploy]
+startCommand = "cd backend && npm run worker"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

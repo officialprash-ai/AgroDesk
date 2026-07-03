@@ -79,6 +79,12 @@ router.post('/:id/contact', async (req, res) => {
     const existing = await prisma.recoveryCase.findUnique({ where: { id: req.params.id } });
     if (!existing || existing.dealer_id !== dealer_id) return res.status(404).json({ error: 'Not found' });
 
+    // Legal hold: a case under legal escalation must not be contacted directly.
+    // (Bulk recovery already excludes legal-stage cases; this closes the single-case path.)
+    if (existing.escalation_stage === 'legal') {
+      return res.status(403).json({ error: 'Case is under legal hold - direct contact is not allowed.' });
+    }
+
     const history = Array.isArray(existing.channel_history) ? (existing.channel_history as any[]) : [];
     const newEntry = { channel, outcome, date: new Date().toISOString() };
     const updated = await prisma.recoveryCase.update({

@@ -136,10 +136,13 @@ router.patch('/:id/description', async (req, res) => {
   }
 });
 
-// POST /api/tractors/urgency-refresh — daily cron: increment days_on_lot + recalc scores
+// POST /api/tractors/urgency-refresh - increment days_on_lot + recalc scores.
+// Scoped to the authenticated dealer's own inventory so one dealer can't trigger a
+// global recompute across every dealer's tractors (noisy-neighbor / cost issue).
 router.post('/urgency-refresh', async (req, res) => {
   try {
-    const tractors = await prisma.usedTractor.findMany({ where: { status: 'available' } });
+    const dealer_id = (req as AuthRequest).dealer_id!;
+    const tractors = await prisma.usedTractor.findMany({ where: { status: 'available', dealer_id } });
     let updated = 0;
     for (const t of tractors) {
       const newDays = t.days_on_lot + 1;

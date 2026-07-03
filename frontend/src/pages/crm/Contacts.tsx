@@ -6,7 +6,12 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatRelative, LANGUAGES } from '../../lib/utils';
-import { UserPlus, Phone, MessageSquare, Sparkles, Filter, Download, ChevronUp, ChevronDown, Eye, Pencil } from 'lucide-react';
+import { UserPlus, Phone, MessageSquare, Sparkles, Filter, Download, ChevronUp, ChevronDown, Eye, Pencil, Trash2 } from 'lucide-react';
+
+// Build tel: and WhatsApp links from any Indian phone format
+const digitsOnly = (p: string) => (p || '').replace(/\D/g, '');
+const telHref = (p: string) => `tel:+${digitsOnly(p).length === 10 ? '91' + digitsOnly(p) : digitsOnly(p)}`;
+const waHref = (p: string) => `https://wa.me/${digitsOnly(p).length === 10 ? '91' + digitsOnly(p) : digitsOnly(p)}`;
 
 const STAGE_TABS = [
   { id: 'all', label: 'All', count: 0 },
@@ -43,6 +48,11 @@ export const Contacts: React.FC = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Delete contact
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const openView = (c: any) => {
     setActiveContact(c);
     setEditForm({
@@ -76,6 +86,22 @@ export const Contacts: React.FC = () => {
       setEditError('Failed to save changes — please try again.');
     }
     setEditLoading(false);
+  };
+
+  const handleDeleteContact = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await api.contacts.delete(deleteTarget.id);
+      setDeleteTarget(null);
+      if (activeContact?.id === deleteTarget.id) closeView();
+      refetch();
+    } catch (e) {
+      console.error(e);
+      setDeleteError('Failed to delete — please try again.');
+    }
+    setDeleteLoading(false);
   };
 
   const handleSaveContact = async () => {
@@ -245,15 +271,24 @@ export const Contacts: React.FC = () => {
                           className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.08)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors" title="View contact">
                           <Eye size={13} />
                         </button>
-                        <button className="p-1.5 rounded-lg hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-muted)] hover:text-brand-400 transition-colors" title="Call">
+                        <a href={c.opt_in_call ? telHref(c.phone) : undefined} onClick={e => { if (!c.opt_in_call) { e.preventDefault(); } }}
+                          className={`p-1.5 rounded-lg transition-colors ${c.opt_in_call ? 'hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-muted)] hover:text-brand-400' : 'text-[var(--text-muted)] opacity-30 cursor-not-allowed'}`}
+                          title={c.opt_in_call ? `Call ${c.phone}` : 'No call opt-in'}>
                           <Phone size={13} />
-                        </button>
-                        <button className="p-1.5 rounded-lg hover:bg-[rgba(96,165,250,0.1)] text-[var(--text-muted)] hover:text-blue-400 transition-colors" title="WhatsApp">
+                        </a>
+                        <a href={c.opt_in_whatsapp ? waHref(c.phone) : undefined} target="_blank" rel="noopener noreferrer"
+                          onClick={e => { if (!c.opt_in_whatsapp) { e.preventDefault(); } }}
+                          className={`p-1.5 rounded-lg transition-colors ${c.opt_in_whatsapp ? 'hover:bg-[rgba(96,165,250,0.1)] text-[var(--text-muted)] hover:text-blue-400' : 'text-[var(--text-muted)] opacity-30 cursor-not-allowed'}`}
+                          title={c.opt_in_whatsapp ? 'Open WhatsApp' : 'No WhatsApp opt-in'}>
                           <MessageSquare size={13} />
-                        </button>
+                        </a>
                         <button onClick={() => openScriptModal('cold_call_new', { contact: c })}
                           className="p-1.5 rounded-lg hover:bg-[rgba(167,139,250,0.1)] text-[var(--text-muted)] hover:text-purple-400 transition-colors" title="AI Script">
                           <Sparkles size={13} />
+                        </button>
+                        <button onClick={() => { setDeleteTarget(c); setDeleteError(null); }}
+                          className="p-1.5 rounded-lg hover:bg-[rgba(239,68,68,0.1)] text-[var(--text-muted)] hover:text-red-400 transition-colors" title="Delete contact">
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </td>
@@ -295,3 +330,128 @@ export const Contacts: React.FC = () => {
               </label>
               <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
                 <input type="checkbox" className="accent-brand-400" checked={form.opt_in_call} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, opt_in_call: e.target.checked }))} /> Call opt-in
+              </label>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button onClick={handleSaveContact} loading={addLoading} disabled={addLoading}>Save Contact</Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* View / Edit Contact Modal */}
+        <Modal open={!!activeContact} onClose={closeView} title={isEditing ? 'Edit Contact' : 'Contact Details'} size="lg">
+          {activeContact && editForm && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar name={activeContact.name} size={40} />
+                <div>
+                  <p className="font-medium text-sm text-[var(--text-primary)]">{activeContact.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] font-mono">{activeContact.phone}</p>
+                </div>
+                <div className="ml-auto">
+                  <Badge variant={activeContact.lead_status === 'won' ? 'active' : activeContact.lead_status === 'lost' ? 'overdue' : activeContact.lead_status === 'qualified' || activeContact.lead_status === 'proposal' ? 'pending' : 'info'}>
+                    {activeContact.lead_status}
+                  </Badge>
+                </div>
+              </div>
+
+              {isEditing ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="Full Name" value={editForm.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, name: e.target.value }))} />
+                    <Input label="Phone" value={editForm.phone} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, phone: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input label="Village" value={editForm.village} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, village: e.target.value }))} />
+                    <Input label="District" value={editForm.district} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, district: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select label="Language" options={LANGUAGES.map(l => ({ value: l.code, label: l.label }))} value={editForm.language} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditForm((f: any) => ({ ...f, language: e.target.value }))} />
+                    <Select label="Lead Stage" options={LEAD_STAGE_OPTIONS} value={editForm.lead_status} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditForm((f: any) => ({ ...f, lead_status: e.target.value }))} />
+                  </div>
+                  <div className="flex gap-2">
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                      <input type="checkbox" className="accent-brand-400" checked={editForm.opt_in_whatsapp} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, opt_in_whatsapp: e.target.checked }))} /> WhatsApp opt-in
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                      <input type="checkbox" className="accent-brand-400" checked={editForm.opt_in_sms} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, opt_in_sms: e.target.checked }))} /> SMS opt-in
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                      <input type="checkbox" className="accent-brand-400" checked={editForm.opt_in_call} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm((f: any) => ({ ...f, opt_in_call: e.target.checked }))} /> Call opt-in
+                    </label>
+                  </div>
+                  {editError && <p className="text-xs text-red-400">{editError}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" onClick={() => { setIsEditing(false); openView(activeContact); }} disabled={editLoading}>Cancel</Button>
+                    <Button onClick={handleUpdateContact} loading={editLoading} disabled={editLoading}>Save Contact</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Location</p>
+                      <p className="text-[var(--text-primary)]">{activeContact.village || '—'}{activeContact.village && activeContact.district ? ', ' : ''}{activeContact.district || ''}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Language</p>
+                      <p className="text-[var(--text-primary)]">{LANGUAGES.find(l => l.code === activeContact.language)?.label || activeContact.language}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Score</p>
+                      <p className="text-[var(--text-primary)]">{activeContact.score}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--text-muted)]">Last Contact</p>
+                      <p className="text-[var(--text-primary)]">{activeContact.last_contact ? formatRelative(activeContact.last_contact) : '—'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] mb-1">Channels</p>
+                    <div className="flex gap-1">
+                      {activeContact.opt_in_whatsapp && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.1)] text-brand-400">WA</span>}
+                      {activeContact.opt_in_sms && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(96,165,250,0.1)] text-blue-400">SMS</span>}
+                      {activeContact.opt_in_call && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[rgba(251,191,36,0.1)] text-amber-400">Call</span>}
+                      {!activeContact.opt_in_whatsapp && !activeContact.opt_in_sms && !activeContact.opt_in_call && <span className="text-xs text-[var(--text-muted)]">None</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end items-center">
+                    <a href={activeContact.opt_in_call ? telHref(activeContact.phone) : undefined}
+                      onClick={e => { if (!activeContact.opt_in_call) e.preventDefault(); }}
+                      className={`p-2 rounded-lg transition-colors ${activeContact.opt_in_call ? 'hover:bg-[rgba(74,222,128,0.1)] text-[var(--text-secondary)] hover:text-brand-400' : 'opacity-30 cursor-not-allowed text-[var(--text-muted)]'}`}
+                      title={activeContact.opt_in_call ? 'Call' : 'No call opt-in'}><Phone size={15} /></a>
+                    <a href={activeContact.opt_in_whatsapp ? waHref(activeContact.phone) : undefined} target="_blank" rel="noopener noreferrer"
+                      onClick={e => { if (!activeContact.opt_in_whatsapp) e.preventDefault(); }}
+                      className={`p-2 rounded-lg transition-colors ${activeContact.opt_in_whatsapp ? 'hover:bg-[rgba(96,165,250,0.1)] text-[var(--text-secondary)] hover:text-blue-400' : 'opacity-30 cursor-not-allowed text-[var(--text-muted)]'}`}
+                      title={activeContact.opt_in_whatsapp ? 'WhatsApp' : 'No WhatsApp opt-in'}><MessageSquare size={15} /></a>
+                    <span className="flex-1" />
+                    <Button variant="ghost" className="text-red-400 hover:bg-[rgba(239,68,68,0.1)]" icon={<Trash2 size={13} />} onClick={() => { setDeleteTarget(activeContact); setDeleteError(null); }}>Delete</Button>
+                    <Button variant="ghost" onClick={closeView}>Close</Button>
+                    <Button icon={<Pencil size={13} />} onClick={() => setIsEditing(true)}>Edit</Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal open={!!deleteTarget} onClose={() => { if (!deleteLoading) setDeleteTarget(null); }} title="Delete Contact">
+          {deleteTarget && (
+            <div className="space-y-4">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Delete <span className="font-semibold text-[var(--text-primary)]">{deleteTarget.name}</span> ({deleteTarget.phone})? This can’t be undone.
+              </p>
+              {deleteError && <p className="text-xs text-red-400">{deleteError}</p>}
+              <div className="flex gap-2 justify-end">
+                <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>Cancel</Button>
+                <Button className="bg-red-500 hover:bg-red-600 text-white" icon={<Trash2 size={13} />} onClick={handleDeleteContact} loading={deleteLoading} disabled={deleteLoading}>Delete</Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
+    </div>
+  );
+};

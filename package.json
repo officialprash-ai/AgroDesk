@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "build": "cd backend && npm install && npm run build",
-    "start": "cd backend && npm run start"
+    "start": "cd backend && npm run start",
+    "worker": "cd backend && npm run worker"
   },
   "engines": {
     "node": ">=20"

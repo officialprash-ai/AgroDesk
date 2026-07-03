@@ -45,6 +45,16 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+// In production, webhook signature secrets are mandatory. Without them the webhook
+// auth below would fail OPEN (accept unsigned requests). Refuse to start instead.
+if (process.env.NODE_ENV === 'production') {
+  const prodMissing = ['TWILIO_AUTH_TOKEN', 'EXOTEL_WEBHOOK_TOKEN'].filter(k => !process.env[k]);
+  if (prodMissing.length > 0) {
+    console.error(`FATAL: Missing production webhook secrets: ${prodMissing.join(', ')}. Refusing to start.`);
+    process.exit(1);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -117,8 +127,11 @@ app.use(globalLimiter);
 function twilioWebhookAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!authToken) {
-    // If no token configured, skip validation (dev mode) but log a warning
-    console.warn('[webhook] TWILIO_AUTH_TOKEN not set — skipping signature validation');
+    // Fail CLOSED in production; only skip (dev convenience) outside production.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Webhook auth not configured' });
+    }
+    console.warn('[webhook] TWILIO_AUTH_TOKEN not set - skipping signature validation (dev only)');
     return next();
   }
 
@@ -156,7 +169,11 @@ function twilioWebhookAuth(req: express.Request, res: express.Response, next: ex
 function exotelWebhookAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const expectedToken = process.env.EXOTEL_WEBHOOK_TOKEN;
   if (!expectedToken) {
-    console.warn('[webhook/exotel] EXOTEL_WEBHOOK_TOKEN not set — skipping validation');
+    // Fail CLOSED in production; only skip (dev convenience) outside production.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Webhook auth not configured' });
+    }
+    console.warn('[webhook/exotel] EXOTEL_WEBHOOK_TOKEN not set - skipping validation (dev only)');
     return next();
   }
   const providedToken = req.query.token as string;
