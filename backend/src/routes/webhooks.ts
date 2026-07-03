@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { prisma as _prisma } from '../lib/prisma.js';
 const prisma = _prisma as any;
-import Anthropic from '@anthropic-ai/sdk';
 import { sendWhatsApp } from '../lib/whatsapp.js';
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { geminiText } from '../lib/llm.js';
 
 const LANG_NAMES: Record<string, string> = { mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali' };
 
@@ -37,13 +36,7 @@ Keep responses concise (2-4 sentences). Use Indian currency (₹).
 Never make up prices — say you'll check and confirm.
 Scope: tractor sales only. Escalate complex legal/financial questions to human agent.${history}`;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 400,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: inboundText }],
-    });
-    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    const reply = await geminiText({ system: systemPrompt, messages: [{ role: 'user', content: inboundText }], maxTokens: 400 });
     if (!reply) return;
 
     const { sid } = await sendWhatsApp(fromPhone, reply);
@@ -86,16 +79,8 @@ async function findContact(dealerId: string, phone: string) {
 /** Quick AI label: sentiment + intent from a short text. */
 async function labelMessage(text: string): Promise<{ sentiment: string; intent: string }> {
   try {
-    const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 60,
-      messages: [{
-        role: 'user',
-        content: `Classify this customer reply in JSON with keys "sentiment" (positive/neutral/negative) and "intent" (interested/not_interested/callback/info_request/complaint/other). Reply ONLY with JSON.\n\nMessage: "${text}"`,
-      }],
-    });
-    const raw = (msg.content[0] as { text: string }).text.trim();
-    return JSON.parse(raw);
+    const raw = await geminiText({ messages: [{ role: 'user', content: `Classify this customer reply in JSON with keys "sentiment" (positive/neutral/negative) and "intent" (interested/not_interested/callback/info_request/complaint/other). Reply ONLY with JSON.\n\nMessage: "${text}"` }], maxTokens: 60 });
+    return JSON.parse(raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/i, ''));
   } catch {
     return { sentiment: 'neutral', intent: 'other' };
   }

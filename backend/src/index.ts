@@ -15,7 +15,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import Anthropic from '@anthropic-ai/sdk';
+import { geminiText } from './lib/llm.js';
 import { prisma as _prisma } from './lib/prisma.js';
 const prisma = _prisma as any;
 
@@ -38,7 +38,7 @@ import { getAudio } from './lib/audioStore.js';
 import { buildExoML } from './lib/exotel.js';
 
 // ─── ENV VALIDATION (fail fast) ─────────────────────────────
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'ANTHROPIC_API_KEY'] as const;
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'GEMINI_API_KEY'] as const;
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length > 0) {
   console.error(`FATAL: Missing required env vars: ${missing.join(', ')}. Refusing to start.`);
@@ -207,11 +207,7 @@ app.use('/api/onboarding', authMiddleware, onboardingRouter);
 app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  timeout: 30_000, // fail after 30s instead of the SDK's 10-min default (prevents "spins forever")
-  maxRetries: 1,
-});
+// LLM calls go through geminiText (src/lib/llm.ts).
 
 app.post('/api/ai/script', authMiddleware, aiLimiter, async (req, res) => {
   const { type, language, context } = req.body;
@@ -254,12 +250,7 @@ Context: ${JSON.stringify(context || {})}
 Return ONLY the script text, no explanation, no markdown.`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 600,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    const script = message.content[0].type === 'text' ? message.content[0].text : '';
+    const script = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 600 });
     res.json({ script, type, language, generated_at: new Date() });
   } catch (err) {
     console.error('AI script error:', err);
@@ -290,12 +281,7 @@ Requirements:
 - No markdown, just plain text`;
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    const description = message.content[0].type === 'text' ? message.content[0].text : '';
+    const description = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 200 });
 
     if (tractor.id) {
       await prisma.usedTractor.update({
@@ -357,14 +343,7 @@ If the customer has interacted before (see history below), acknowledge continuit
       { role: 'user' as const, content: message },
     ];
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 400,
-      system: systemPrompt,
-      messages,
-    });
-
-    const reply = response.content[0].type === 'text' ? response.content[0].text : '';
+    const reply = await geminiText({ system: systemPrompt, messages, maxTokens: 400 });
 
     if (contact_id) {
       await prisma.conversation.create({
