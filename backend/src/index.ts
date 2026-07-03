@@ -245,7 +245,7 @@ Requirements:
 - Start with a greeting appropriate for the region
 - End with a clear call-to-action
 - Use the dealership's REAL name "${dealer?.name ?? '[Dealership Name]'}" and location "${[dealer?.city, dealer?.district].filter(Boolean).join(', ') || 'Maharashtra'}" - do NOT leave the dealership name as a placeholder
-- Include customer name placeholder as [ग्राहक का नाम] / [Customer Name]
+- ROLES: The SPEAKER/caller is a salesperson working AT the dealership - use [Your Name] as a placeholder for the caller's own name, NEVER a real person's name. The CUSTOMER is the person being CALLED (a different person) - address them with [Customer Name]. Never make the customer the speaker.
 
 Dealer profile: ${JSON.stringify({ name: dealer?.name, city: dealer?.city, district: dealer?.district, brand_ids: dealer?.brand_ids, language: langName })}
 Extra context: ${JSON.stringify(context || {})}
