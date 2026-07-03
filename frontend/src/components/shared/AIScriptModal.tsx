@@ -73,8 +73,6 @@ export const AIScriptModal: React.FC = () => {
       const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
       const raw = localStorage.getItem('agrodesk-auth');
       const token = raw ? JSON.parse(raw)?.state?.token : null;
-      const raw = localStorage.getItem('agrodesk-auth');
-      const token = raw ? JSON.parse(raw)?.state?.token : null;
       const res = await fetch(`${BASE}/api/ai/script`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
