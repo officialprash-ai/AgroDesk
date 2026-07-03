@@ -210,7 +210,9 @@ app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
 // LLM calls go through geminiText (src/lib/llm.ts).
 
 app.post('/api/ai/script', authMiddleware, aiLimiter, async (req, res) => {
+  const dealer_id = (req as AuthRequest).dealer_id!;
   const { type, language, context } = req.body;
+  const dealer = await prisma.dealer.findUnique({ where: { id: dealer_id } }).catch(() => null);
 
   const langNames: Record<string, string> = {
     mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati',
@@ -242,10 +244,11 @@ Requirements:
 - Keep it 150-250 words
 - Start with a greeting appropriate for the region
 - End with a clear call-to-action
-- Include dealer name placeholder as [डीलरशिप का नाम] / [Dealership Name]
+- Use the dealership's REAL name "${dealer?.name ?? '[Dealership Name]'}" and location "${[dealer?.city, dealer?.district].filter(Boolean).join(', ') || 'Maharashtra'}" - do NOT leave the dealership name as a placeholder
 - Include customer name placeholder as [ग्राहक का नाम] / [Customer Name]
 
-Context: ${JSON.stringify(context || {})}
+Dealer profile: ${JSON.stringify({ name: dealer?.name, city: dealer?.city, district: dealer?.district, brand_ids: dealer?.brand_ids, language: langName })}
+Extra context: ${JSON.stringify(context || {})}
 
 Return ONLY the script text, no explanation, no markdown.`;
 

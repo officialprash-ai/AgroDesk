@@ -28,7 +28,7 @@ export async function geminiText(opts: { system?: string; messages: LlmMessage[]
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
-  const body: any = { contents, generationConfig: { maxOutputTokens: opts.maxTokens ?? 500 } };
+  const body: any = { contents, generationConfig: { maxOutputTokens: opts.maxTokens ?? 800, thinkingConfig: { thinkingBudget: 0 } } };
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
   return callGemini(body);
 }
@@ -43,7 +43,7 @@ export async function geminiVision(opts: { base64: string; mimeType: string; pro
         { text: opts.prompt },
       ],
     }],
-    generationConfig: { maxOutputTokens: opts.maxTokens ?? 500 },
+    generationConfig: { maxOutputTokens: opts.maxTokens ?? 800, thinkingConfig: { thinkingBudget: 0 } },
   };
   return callGemini(body);
 }
