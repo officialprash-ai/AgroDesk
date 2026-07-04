@@ -291,11 +291,20 @@ export const ColdCalling: React.FC = () => {
     showToast('Note saved');
   };
 
-  const handleCallRow = (call: Call) => {
-    openScriptModal('cold_call_new', { contact: { id: call.id, name: call.name, phone: call.phone, language: call.language } });
+  const handleCallRow = async (call: Call) => {
+    if (!dealer?.id) { showToast('Set up your dealer profile first', 'error'); return; }
+    if (/^\d+$/.test(call.id)) { showToast('Save this contact to CRM before calling', 'error'); return; }
     setCalls(prev => prev.map(c => c.id === call.id ? { ...c, status: 'in_progress', time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) } : c));
     setRunning(true);
     setLiveTimer(0);
+    try {
+      await api.jobs.create({ agent_type: 'voice_call', payload: { contact_id: call.id, language: call.language }, dealer_id: dealer.id });
+      showToast(`Calling ${call.name} - AI is dialing...`);
+    } catch (e: any) {
+      setCalls(prev => prev.map(c => c.id === call.id ? { ...c, status: 'pending' } : c));
+      setRunning(false);
+      showToast(e?.message ?? 'Failed to queue call - check consent & provider setup', 'error');
+    }
   };
 
   const handleNewCampaign = async () => {

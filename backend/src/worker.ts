@@ -31,6 +31,7 @@ const prisma = _prisma as any;
 
 import { textToSpeech } from './lib/sarvam.js';
 import { placeCall, buildExoML } from './lib/exotel.js';
+import { geminiText } from './lib/llm.js';
 import { sendWhatsApp } from './lib/whatsapp.js';
 import { sendSMS, DLTTemplateKey } from './lib/sms.js';
 import { storeAudio } from './lib/audioStore.js';
@@ -147,8 +148,16 @@ async function handleVoiceCall(data: QueueJobData) {
     phone = contact.phone;
     language = contact.language ?? 'mr';
 
-    // If no script in payload, generate one via recovery/campaign context
-    if (!script) throw new Error('No script provided in job payload');
+    // Auto-generate a personalized cold-call script if none supplied (one-click Call).
+    if (!script) {
+      const dealer = await prisma.dealer.findUnique({ where: { id: data.dealer_id } }).catch(() => null);
+      const langName = ({ mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali' } as Record<string, string>)[language] ?? 'Marathi';
+      script = await geminiText({
+        messages: [{ role: 'user', content: `Write a warm cold-call script in ${langName} for a tractor dealership salesperson calling a farmer named ${contact.name}. Dealership: ${dealer?.name ?? 'our dealership'}${dealer?.city ? ', ' + dealer.city : ''}. The SPEAKER is the salesperson (use [Your Name] placeholder; NEVER use the customer name as the speaker). 60-90 words, natural spoken ${langName}, end by inviting them to visit the showroom. Return ONLY the spoken words.` }],
+        maxTokens: 400,
+      });
+      if (!script) throw new Error('Failed to generate call script');
+    }
   } else if (data.payload.case_id) {
     const recoveryCase = await prisma.recoveryCase.findUnique({
       where: { id: data.payload.case_id as string },
