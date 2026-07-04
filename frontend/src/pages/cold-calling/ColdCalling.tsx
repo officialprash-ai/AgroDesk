@@ -293,7 +293,7 @@ export const ColdCalling: React.FC = () => {
 
   const handleCallRow = async (call: Call) => {
     if (!dealer?.id) { showToast('Set up your dealer profile first', 'error'); return; }
-    if (/^\d+$/.test(call.id)) { showToast('Save this contact to CRM before calling', 'error'); return; }
+    if (/^\d+$/.test(String(call.id))) { showToast('Save this contact to CRM before calling', 'error'); return; }
     setCalls(prev => prev.map(c => c.id === call.id ? { ...c, status: 'in_progress', time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) } : c));
     setRunning(true);
     setLiveTimer(0);
