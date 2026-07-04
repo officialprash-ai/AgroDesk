@@ -22,4 +22,13 @@ echo "Starting agent worker..."
 
 # Terminal 3: Frontend
 echo "Starting frontend on :5173..."
-(c
+(cd frontend && npm run dev) &
+
+echo ""
+echo "✅ AgroDesk running:"
+echo "   Frontend: http://localhost:5173"
+echo "   API:      http://localhost:3001/api/health"
+echo "   Worker:   running in background (see logs above)"
+echo ""
+echo "Press Ctrl+C to stop all three"
+wait

@@ -42,3 +42,9 @@ postgres-data/
 redis-data/
 .vercel
 .env*
+
+# CI / test noise
+backend/coverage/
+frontend/coverage/
+*.timestamp-*.mjs
+.fuse_hidden*
