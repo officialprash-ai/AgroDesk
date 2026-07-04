@@ -72,3 +72,5 @@ API → http://localhost:3001/api/health
 ## Languages Supported
 
 Marathi (default) · Hindi · English · Gujarati · Punjabi · Tamil · Telugu · Kannada · Bengali
+
+<!-- CI pipeline demo -->
