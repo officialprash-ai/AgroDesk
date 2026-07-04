@@ -44,11 +44,14 @@ export async function placeCall(
     throw new Error('Exotel credentials not configured (EXOTEL_API_KEY / EXOTEL_API_TOKEN / EXOTEL_SID / EXOTEL_PHONE)');
   }
 
+  // Exotel "connect to applet": Exotel dials `From` (the customer), and once they
+  // answer, runs the ExoML at `Url`. `CallerId` is the ExoPhone shown to the customer.
+  // `To` is NOT used in this mode — putting the customer in `To` (as before) made
+  // Exotel dial our own ExoPhone into an empty applet, so the customer never rang.
   const body = new URLSearchParams({
-    From:           EXOTEL_PHONE,
-    To:             normalisePhone(to),
-    Url:            exomlUrl,
-    CallerId:       EXOTEL_PHONE,
+    From:           normalisePhone(to),   // the customer we want to reach
+    CallerId:       EXOTEL_PHONE,          // our ExoPhone, shown to the customer
+    Url:            exomlUrl,              // ExoML played once they answer
     StatusCallback: statusCallbackUrl,
     'StatusCallbackEvents[0]': 'terminal',
     TimeLimit:      '120',   // max 2 min call
