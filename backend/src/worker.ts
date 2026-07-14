@@ -131,6 +131,20 @@ const LANG_NAMES: Record<string, string> = {
 };
 
 /**
+ * Normalise an Indian phone number to strict E.164 (+91XXXXXXXXXX).
+ * Plivo requires E.164 for the `to` number — a bare 10-digit number is treated
+ * as an unknown/barred destination ("Calls to this destination region are barred").
+ */
+function toE164India(phone: string): string {
+  if (phone.trim().startsWith('+')) return phone.trim().replace(/\s+/g, '');
+  const d = phone.replace(/\D/g, '');
+  if (d.length === 10) return `+91${d}`;                 // 7058617473
+  if (d.length === 12 && d.startsWith('91')) return `+${d}`; // 917058617473
+  if (d.length === 11 && d.startsWith('0')) return `+91${d.slice(1)}`; // 07058617473
+  return `+${d}`; // fallback — already includes a country code
+}
+
+/**
  * How outbound voice calls are placed:
  *   'streaming' → Plivo (TELEPHONY_PROVIDER) bidirectional AI voice — a live
  *                 two-way conversation (STT → Gemini → TTS). This is the path
@@ -165,7 +179,7 @@ async function placeStreamingCall(opts: {
   const answerUrl = `${BASE_URL}/api/telephony/answer?${q.toString()}`;
   const provider = getTelephonyProvider(); // throws a clear error if creds are missing
   const handle = await provider.initiateCall({
-    to: opts.to,
+    to: toE164India(opts.to),
     from,
     answerStreamUrl: answerUrl,
     metadata: { dealerId: opts.dealerId, contactId: opts.contactId ?? '' },
@@ -563,7 +577,7 @@ agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
   // Mark in-progress
   await prisma.agentJob.update({
     where: { id: db_job_id },
-    data: { status: 'in_progress', started_at: new Date() },
+    data: { status: 'in_progress', attempts: { increment: 1 } },
   }).catch(() => {});
 
   try {
@@ -587,7 +601,7 @@ agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
 
     await prisma.agentJob.update({
       where: { id: db_job_id },
-      data: { status: 'failed', error_message: err.message },
+      data: { status: 'failed', error: String(err.message).slice(0, 500) },
     }).catch(() => {});
 
     throw err; // re-throw so Bull retries
