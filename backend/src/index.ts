@@ -36,6 +36,8 @@ import { resetDemoData } from './lib/demoSeed.js';
 import { enqueueJob } from './lib/queue.js';
 import { getAudio } from './lib/audioStore.js';
 import { buildExoML } from './lib/exotel.js';
+import { createServer } from 'http';
+import { attachTelephonyBridge, getTelephonyProvider } from './telephony/index.js';
 
 // ─── ENV VALIDATION (fail fast) ─────────────────────────────
 const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'GEMINI_API_KEY'] as const;
@@ -382,6 +384,31 @@ app.get('/api/exoml/:id', (req, res) => {
   res.send(buildExoML(audioUrl));
 });
 
+// ─── PLIVO ANSWER (public — Plivo fetches this when a streaming call connects) ─
+// Returns <Stream> XML pointing at our media WebSocket (/telephony/stream).
+// Only relevant when TELEPHONY_PROVIDER=plivo. Optional query: dealershipId,
+// contactId, language, greeting — the last two let an outbound call open in the
+// contact's language with a spoken greeting (see worker.ts placeStreamingCall).
+app.post('/api/telephony/answer', (req, res) => {
+  try {
+    const wssUrl = process.env.TELEPHONY_PUBLIC_WSS_URL;
+    if (!wssUrl) return res.status(503).send('<Response/>');
+    // Params come in on the query string for POST too; fall back to the body.
+    const q = { ...(req.body ?? {}), ...req.query } as Record<string, unknown>;
+    const xml = getTelephonyProvider().buildAnswerResponse(wssUrl, {
+      dealershipId: String(q.dealershipId ?? ''),
+      contactId: String(q.contactId ?? ''),
+      language: String(q.language ?? ''),
+      greeting: String(q.greeting ?? ''),
+    });
+    res.setHeader('Content-Type', 'text/xml');
+    res.send(xml);
+  } catch (err) {
+    console.error('[telephony/answer]', err);
+    res.status(500).send('<Response/>');
+  }
+});
+
 // ─── AGENT JOBS (protected) ──────────────────────────────────
 app.post('/api/jobs', authMiddleware, demoGuard, async (req, res) => {
   try {
@@ -461,7 +488,18 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+const server = createServer(app);
+
+// Real-time voice WebSocket bridge (Plivo streaming → Sarvam STT → Gemini → Sarvam TTS).
+// Mounts at /telephony/stream. Skips gracefully if the selected provider isn't
+// configured yet (e.g. Plivo creds not set), so the app still boots.
+try {
+  attachTelephonyBridge(server);
+} catch (err) {
+  console.warn('[telephony] voice bridge not mounted:', (err as Error).message);
+}
+
+server.listen(PORT, () => {
   console.log(`AgroDesk API running on port ${PORT}`);
 });
 

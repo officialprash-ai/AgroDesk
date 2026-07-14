@@ -31,6 +31,7 @@ const prisma = _prisma as any;
 
 import { textToSpeech } from './lib/sarvam.js';
 import { placeCall, buildExoML } from './lib/exotel.js';
+import { getTelephonyProvider, TELEPHONY_PROVIDER } from './telephony/index.js';
 import { geminiText } from './lib/llm.js';
 import { sendWhatsApp } from './lib/whatsapp.js';
 import { sendSMS, DLTTemplateKey } from './lib/sms.js';
@@ -124,6 +125,71 @@ async function markFailed(jobId: string, error: string) {
 
 // ─── Handlers ───────────────────────────────────────────────
 
+const LANG_NAMES: Record<string, string> = {
+  mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi',
+  ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali',
+};
+
+/**
+ * How outbound voice calls are placed:
+ *   'streaming' → Plivo (TELEPHONY_PROVIDER) bidirectional AI voice — a live
+ *                 two-way conversation (STT → Gemini → TTS). This is the path
+ *                 you asked to make real.
+ *   'oneway'    → legacy Exotel: synthesize the whole script, <Play> it, hang up.
+ * Defaults to 'streaming'.
+ */
+const VOICE_CALL_MODE = (process.env.VOICE_CALL_MODE ?? 'streaming').toLowerCase();
+
+/**
+ * Place a real bidirectional streaming call via the configured telephony
+ * provider (Plivo primary). The provider dials `to`; when the callee answers,
+ * Plivo fetches our /api/telephony/answer webhook, which returns <Stream> XML
+ * pointing at the media WebSocket. language + greeting ride along as query
+ * params so the voice engine opens in the right language.
+ * Returns the provider call id.
+ */
+async function placeStreamingCall(opts: {
+  to: string;
+  language: string;
+  greeting: string;
+  dealerId: string;
+  contactId?: string;
+}): Promise<string> {
+  const from = process.env.PLIVO_FROM_NUMBER ?? '';
+  const q = new URLSearchParams({
+    dealershipId: opts.dealerId,
+    contactId: opts.contactId ?? '',
+    language: opts.language,
+    greeting: opts.greeting,
+  });
+  const answerUrl = `${BASE_URL}/api/telephony/answer?${q.toString()}`;
+  const provider = getTelephonyProvider(); // throws a clear error if creds are missing
+  const handle = await provider.initiateCall({
+    to: opts.to,
+    from,
+    answerStreamUrl: answerUrl,
+    metadata: { dealerId: opts.dealerId, contactId: opts.contactId ?? '' },
+  });
+  return handle.callId;
+}
+
+/** Short 1–2 sentence opener the AI agent speaks the instant the callee picks up. */
+async function buildStreamingGreeting(
+  langName: string,
+  calleeName: string,
+  dealerName: string,
+  dealerCity: string,
+  kind: 'sales' | 'recovery',
+): Promise<string> {
+  const who = calleeName ? ` to ${calleeName}` : '';
+  const prompt =
+    kind === 'recovery'
+      ? `Write a polite 1-2 sentence phone-call opening line in ${langName}, spoken by a tractor dealership representative calling${who} about a pending payment. Warm and respectful, no threats. Return ONLY the spoken words.`
+      : `Write a warm 1-2 sentence phone-call opening line in ${langName}, spoken by a salesperson from ${dealerName}${dealerCity ? ' in ' + dealerCity : ''} calling${who}, a farmer, about tractors. Return ONLY the spoken words.`;
+  const greeting = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 120 }).catch(() => '');
+  return greeting?.trim() || 'Namaskar! AgroDesk kडून bolat aahe. Tumhala tractor baddal madat havi ka?';
+}
+
 /**
  * Outbound voice call — cold_call / follow_up / recovery_call
  *
@@ -135,46 +201,80 @@ async function markFailed(jobId: string, error: string) {
 async function handleVoiceCall(data: QueueJobData) {
   await waitForAllowedWindow();
 
+  const suppliedScript = data.payload.script as string | undefined;
+  const contactId = (data.payload.contact_id as string) ?? '';
+  const caseId = (data.payload.case_id as string) ?? '';
+
   let phone: string;
   let language = 'mr';
-  let script: string = data.payload.script as string;
+  let calleeName = '';
+  let dealerName = 'our dealership';
+  let dealerCity = '';
+  let recoveryAmountDue = 0;
+  let recoveryStage = '';
 
-  if (data.payload.contact_id) {
-    const contact = await prisma.contact.findUnique({
-      where: { id: data.payload.contact_id as string },
-    });
-    if (!contact) throw new Error(`Contact ${data.payload.contact_id} not found`);
+  if (contactId) {
+    const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!contact) throw new Error(`Contact ${contactId} not found`);
     if (!contact.opt_in_call) throw new Error(`Contact ${contact.id} has not opted in to calls`);
     phone = contact.phone;
     language = contact.language ?? 'mr';
+    calleeName = contact.name ?? '';
+    const dealer = await prisma.dealer.findUnique({ where: { id: data.dealer_id } }).catch(() => null);
+    if (dealer) { dealerName = dealer.name ?? dealerName; dealerCity = dealer.city ?? ''; }
+  } else if (caseId) {
+    const recoveryCase = await prisma.recoveryCase.findUnique({ where: { id: caseId } });
+    if (!recoveryCase) throw new Error(`RecoveryCase ${caseId} not found`);
+    phone = recoveryCase.phone;
+    calleeName = recoveryCase.customer_name ?? '';
+    recoveryAmountDue = recoveryCase.amount_due;
+    recoveryStage = (data.payload.escalation_stage as string) ?? recoveryCase.escalation_stage;
+  } else {
+    throw new Error('Voice call job requires contact_id or case_id in payload');
+  }
 
-    // Auto-generate a personalized cold-call script if none supplied (one-click Call).
-    if (!script) {
-      const dealer = await prisma.dealer.findUnique({ where: { id: data.dealer_id } }).catch(() => null);
-      const langName = ({ mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali' } as Record<string, string>)[language] ?? 'Marathi';
+  const langName = LANG_NAMES[language] ?? 'Marathi';
+
+  // ─── STREAMING PATH (Plivo primary): live two-way AI voice call ───
+  if (VOICE_CALL_MODE === 'streaming') {
+    const greeting =
+      suppliedScript?.trim() ||
+      (await buildStreamingGreeting(langName, calleeName, dealerName, dealerCity, caseId ? 'recovery' : 'sales'));
+
+    console.log(`[worker] Placing ${TELEPHONY_PROVIDER} streaming call to ${phone}`);
+    const callId = await placeStreamingCall({ to: phone, language, greeting, dealerId: data.dealer_id, contactId });
+    console.log(`[worker] Streaming call placed — ${TELEPHONY_PROVIDER} callId: ${callId}`);
+
+    if (contactId) {
+      await logConsent(data.dealer_id, contactId, 'voice', 'opt_in_flag');
+      await prisma.conversation.create({
+        data: {
+          dealer_id: data.dealer_id,
+          contact_id: contactId,
+          campaign_id: (data.payload.campaign_id as string) ?? null,
+          channel: 'voice',
+          direction: 'outbound',
+          content: `Outbound streaming call placed (${TELEPHONY_PROVIDER}). Opening: ${greeting.slice(0, 180)}`,
+          status: 'sent',
+          twilio_sid: callId,
+        },
+      }).catch(() => {/* non-fatal */});
+    }
+    return;
+  }
+
+  // ─── ONE-WAY PATH (legacy Exotel): synthesize full script → <Play> → hangup ───
+  let script = suppliedScript;
+  if (!script) {
+    if (contactId) {
       script = await geminiText({
-        messages: [{ role: 'user', content: `Write a warm cold-call script in ${langName} for a tractor dealership salesperson calling a farmer named ${contact.name}. Dealership: ${dealer?.name ?? 'our dealership'}${dealer?.city ? ', ' + dealer.city : ''}. The SPEAKER is the salesperson (use [Your Name] placeholder; NEVER use the customer name as the speaker). 60-90 words, natural spoken ${langName}, end by inviting them to visit the showroom. Return ONLY the spoken words.` }],
+        messages: [{ role: 'user', content: `Write a warm cold-call script in ${langName} for a tractor dealership salesperson calling a farmer named ${calleeName}. Dealership: ${dealerName}${dealerCity ? ', ' + dealerCity : ''}. The SPEAKER is the salesperson (use [Your Name] placeholder; NEVER use the customer name as the speaker). 60-90 words, natural spoken ${langName}, end by inviting them to visit the showroom. Return ONLY the spoken words.` }],
         maxTokens: 400,
       });
       if (!script) throw new Error('Failed to generate call script');
+    } else {
+      script = buildRecoveryScript(calleeName, recoveryAmountDue, recoveryStage);
     }
-  } else if (data.payload.case_id) {
-    const recoveryCase = await prisma.recoveryCase.findUnique({
-      where: { id: data.payload.case_id as string },
-    });
-    if (!recoveryCase) throw new Error(`RecoveryCase ${data.payload.case_id} not found`);
-    phone = recoveryCase.phone;
-    // Fall back to an auto-generated recovery script if the caller didn't supply one
-    // (e.g. the per-case "Call" button in Money Recovery doesn't pass a script).
-    if (!script) {
-      script = buildRecoveryScript(
-        recoveryCase.customer_name,
-        recoveryCase.amount_due,
-        (data.payload.escalation_stage as string) ?? recoveryCase.escalation_stage,
-      );
-    }
-  } else {
-    throw new Error('Voice call job requires contact_id or case_id in payload');
   }
 
   // 1. Generate Marathi TTS audio
@@ -185,7 +285,6 @@ async function handleVoiceCall(data: QueueJobData) {
   const audioId = randomUUID();
   storeAudio(audioId, audioBuffer, 'audio/wav');
 
-  const audioUrl  = `${BASE_URL}/api/audio/${audioId}`;
   const exomlUrl  = `${BASE_URL}/api/exoml/${audioId}`;
   const statusUrl = `${BASE_URL}/webhooks/exotel/call-status?token=${process.env.EXOTEL_WEBHOOK_TOKEN ?? ''}`;
 
@@ -195,7 +294,6 @@ async function handleVoiceCall(data: QueueJobData) {
   console.log(`[worker] Call placed — Exotel SID: ${call_sid}`);
 
   // 4. Log consent + persist conversation
-  const contactId = (data.payload.contact_id as string) ?? '';
   if (contactId) {
     await logConsent(data.dealer_id, contactId, 'voice', 'opt_in_flag');
     await prisma.conversation.create({
