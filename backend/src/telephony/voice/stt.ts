@@ -40,6 +40,11 @@ export class SarvamSttSession {
   private ready = false;
   private queue: string[] = [];
   private closed = false;
+  // Sarvam streaming STT requires fixed 512-sample frames (1024 bytes @ 8kHz
+  // s16le). Plivo delivers ~20ms (~320-byte) chunks, so we re-buffer into exact
+  // frames or Sarvam rejects the stream with an error.
+  private audioBuf: Buffer = Buffer.alloc(0);
+  private static readonly FRAME_BYTES = 1024;
   private readonly apiKey: string;
   private readonly language: string;
   private readonly model: string;
@@ -84,9 +89,14 @@ export class SarvamSttSession {
 
   pushAudio(chunk: PcmChunk): void {
     if (this.closed) return;
-    const frame = JSON.stringify({ audio: { data: chunk.toString('base64') } });
-    if (this.ready && this.ws) this.ws.send(frame);
-    else this.queue.push(frame);
+    this.audioBuf = this.audioBuf.length ? Buffer.concat([this.audioBuf, chunk]) : chunk;
+    while (this.audioBuf.length >= SarvamSttSession.FRAME_BYTES) {
+      const frameBuf = this.audioBuf.subarray(0, SarvamSttSession.FRAME_BYTES);
+      this.audioBuf = this.audioBuf.subarray(SarvamSttSession.FRAME_BYTES);
+      const frame = JSON.stringify({ audio: { data: Buffer.from(frameBuf).toString('base64') } });
+      if (this.ready && this.ws) this.ws.send(frame);
+      else this.queue.push(frame);
+    }
   }
 
   flush(): void {
@@ -130,7 +140,9 @@ export class SarvamSttSession {
         break;
       }
       case 'error':
-        this.cb.onError?.(new Error(`[sarvam-stt] ${String(msg.data?.error ?? 'error')}`));
+        this.cb.onError?.(
+          new Error(`[sarvam-stt] ${String(msg.data?.error ?? msg.data?.message ?? JSON.stringify(msg))}`),
+        );
         break;
       default:
         break;
