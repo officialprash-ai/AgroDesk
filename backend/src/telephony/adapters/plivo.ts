@@ -81,9 +81,21 @@ export class PlivoAdapter implements TelephonyProvider {
     const attrString = Object.entries(attrs)
       .map(([k, v]) => `${k}="${escapeXml(v)}"`)
       .join(' ');
+    // Plivo does not reliably echo extraParams back on the media stream, so we
+    // ALSO append them to the WebSocket URL as a query string. The bridge reads
+    // them from the WS upgrade request — this is the reliable transport for the
+    // per-call greeting/script/language.
+    let urlWithParams = streamWssUrl;
+    if (params) {
+      const qs = Object.entries(params)
+        .filter(([, v]) => v !== '' && v != null)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+      if (qs) urlWithParams += (streamWssUrl.includes('?') ? '&' : '?') + qs;
+    }
     return (
       `<?xml version="1.0" encoding="UTF-8"?>` +
-      `<Response><Stream ${attrString}${extra}>${escapeXml(streamWssUrl)}</Stream></Response>`
+      `<Response><Stream ${attrString}${extra}>${escapeXml(urlWithParams)}</Stream></Response>`
     );
   }
 

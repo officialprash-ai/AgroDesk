@@ -187,7 +187,12 @@ async function placeStreamingCall(opts: {
   return handle.callId;
 }
 
-/** Short 1–2 sentence opener the AI agent speaks the instant the callee picks up. */
+/**
+ * The opening the AI agent speaks when the callee picks up. When the caller
+ * didn't supply a script (plain one-click Call), generate a full, personalized
+ * cold-call / recovery script — the same style the app's AI Script generator
+ * produces — so the agent opens with a real pitch, not a bare greeting.
+ */
 async function buildStreamingGreeting(
   langName: string,
   calleeName: string,
@@ -195,13 +200,12 @@ async function buildStreamingGreeting(
   dealerCity: string,
   kind: 'sales' | 'recovery',
 ): Promise<string> {
-  const who = calleeName ? ` to ${calleeName}` : '';
   const prompt =
     kind === 'recovery'
-      ? `Write a polite 1-2 sentence phone-call opening line in ${langName}, spoken by a tractor dealership representative calling${who} about a pending payment. Warm and respectful, no threats. Return ONLY the spoken words.`
-      : `Write a warm 1-2 sentence phone-call opening line in ${langName}, spoken by a salesperson from ${dealerName}${dealerCity ? ' in ' + dealerCity : ''} calling${who}, a farmer, about tractors. Return ONLY the spoken words.`;
-  const greeting = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 120 }).catch(() => '');
-  return greeting?.trim() || 'Namaskar! AgroDesk kडून bolat aahe. Tumhala tractor baddal madat havi ka?';
+      ? `Write a polite spoken phone-call script in ${langName} for a tractor dealership representative calling a customer named ${calleeName || 'the customer'} about a pending payment. Warm and respectful, no threats. 40-70 words, natural spoken ${langName}, ask when they can clear the amount. Return ONLY the spoken words (no stage directions).`
+      : `Write a warm spoken cold-call script in ${langName} for a salesperson from ${dealerName}${dealerCity ? ' in ' + dealerCity : ''} calling a farmer named ${calleeName || 'the farmer'} about tractors. Introduce yourself and the dealership, mention a helpful offer, and invite them to visit the showroom. 50-80 words, natural spoken ${langName}. Return ONLY the spoken words (no stage directions, no placeholders in brackets).`;
+  const script = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 400 }).catch(() => '');
+  return script?.trim() || 'नमस्कार! ॲग्रोडेस्क कडून बोलतोय. तुम्हाला ट्रॅक्टरबद्दल माहिती हवी आहे का?';
 }
 
 /**

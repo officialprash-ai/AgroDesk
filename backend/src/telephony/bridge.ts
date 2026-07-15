@@ -36,6 +36,16 @@ export interface BridgeDeps {
   logger?: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void };
 }
 
+/** Parse the query string off a WS upgrade request URL into a flat string map. */
+function parseUrlQuery(url?: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!url) return out;
+  const qIndex = url.indexOf('?');
+  if (qIndex === -1) return out;
+  for (const [k, v] of new URLSearchParams(url.slice(qIndex + 1))) out[k] = v;
+  return out;
+}
+
 function req(name: string): string {
   const v = process.env[name];
   if (!v || v.trim() === '') throw new Error(`[telephony] Missing required env var: ${name}`);
@@ -90,15 +100,20 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
   const log = deps.logger ?? console;
   const wss = new WebSocketServer({ server, path: deps.path ?? '/telephony/stream' });
 
-  wss.on('connection', (rawWs) => {
+  wss.on('connection', (rawWs, req) => {
+    // The provider appends per-call params (greeting/script/language/contactId)
+    // to the WS URL, so read them from the upgrade request. These are the reliable
+    // source of call metadata; anything Plivo echoes on the stream is merged on top.
+    const urlMeta = parseUrlQuery((req as { url?: string } | undefined)?.url);
     const session: CallSession = provider.handleStream(rawWs as unknown as TelephonyWebSocket);
     let engine: VoiceEngine | null = null;
 
     session.on((event) => {
       switch (event.type) {
-        case 'call.started':
-          log.info('[telephony] call.started', event.callId, event.metadata);
-          engine = createEngine({ callId: event.callId, metadata: event.metadata });
+        case 'call.started': {
+          const metadata = { ...urlMeta, ...event.metadata };
+          log.info('[telephony] call.started', event.callId, metadata);
+          engine = createEngine({ callId: event.callId, metadata });
           engine.onReplyAudio((pcm) => session.sendAudioChunk(pcm));
           engine.onBargeIn(() => session.clearAudio());
           // Never let an engine start-up rejection become an unhandled rejection
@@ -107,6 +122,7 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
             log.error('[telephony] engine start failed', err),
           );
           break;
+        }
         case 'audio.received':
           engine?.handleCallerAudio(event.chunk);
           break;
