@@ -20,6 +20,7 @@ import type {
 import { PlivoAdapter } from './adapters/plivo.js';
 import { ExotelAdapter } from './adapters/exotel.js';
 import { createAgroDeskEngine } from './voice/engine.js';
+import { takeCallParams } from './callParamsStore.js';
 
 /** The AI half of a call. One instance per call. */
 export interface VoiceEngine {
@@ -101,17 +102,19 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
   const wss = new WebSocketServer({ server, path: deps.path ?? '/telephony/stream' });
 
   wss.on('connection', (rawWs, req) => {
-    // The provider appends per-call params (greeting/script/language/contactId)
-    // to the WS URL, so read them from the upgrade request. These are the reliable
-    // source of call metadata; anything Plivo echoes on the stream is merged on top.
+    // The Stream URL carries a short token; resolve it to the per-call params
+    // (greeting/script/language/ids) stashed by the answer webhook. Falls back to
+    // any raw query params for backward compatibility. Merges anything Plivo
+    // echoes on the stream on top.
     const urlMeta = parseUrlQuery((req as { url?: string } | undefined)?.url);
+    const stored = takeCallParams(urlMeta.token);
     const session: CallSession = provider.handleStream(rawWs as unknown as TelephonyWebSocket);
     let engine: VoiceEngine | null = null;
 
     session.on((event) => {
       switch (event.type) {
         case 'call.started': {
-          const metadata = { ...urlMeta, ...event.metadata };
+          const metadata = { ...urlMeta, ...stored, ...event.metadata } as Record<string, string>;
           log.info('[telephony] call.started', event.callId, metadata);
           engine = createEngine({ callId: event.callId, metadata });
           engine.onReplyAudio((pcm) => session.sendAudioChunk(pcm));

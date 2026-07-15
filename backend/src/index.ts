@@ -38,6 +38,7 @@ import { getAudio } from './lib/audioStore.js';
 import { buildExoML } from './lib/exotel.js';
 import { createServer } from 'http';
 import { attachTelephonyBridge, getTelephonyProvider } from './telephony/index.js';
+import { putCallParams } from './telephony/callParamsStore.js';
 
 // ─── ENV VALIDATION (fail fast) ─────────────────────────────
 const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'GEMINI_API_KEY'] as const;
@@ -395,12 +396,16 @@ app.post('/api/telephony/answer', (req, res) => {
     if (!wssUrl) return res.status(503).send('<Response/>');
     // Params come in on the query string for POST too; fall back to the body.
     const q = { ...(req.body ?? {}), ...req.query } as Record<string, unknown>;
-    const xml = getTelephonyProvider().buildAnswerResponse(wssUrl, {
+    // Stash params in memory and put only a short TOKEN in the Stream URL. The
+    // greeting/script can be long (Marathi), and a long URL-encoded Stream URL
+    // exceeds Plivo's limit → the media socket never connects → call drops.
+    const token = putCallParams({
       dealershipId: String(q.dealershipId ?? ''),
       contactId: String(q.contactId ?? ''),
       language: String(q.language ?? ''),
       greeting: String(q.greeting ?? ''),
     });
+    const xml = getTelephonyProvider().buildAnswerResponse(wssUrl, { token });
     res.setHeader('Content-Type', 'text/xml');
     res.send(xml);
   } catch (err) {
