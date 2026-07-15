@@ -30,12 +30,24 @@ export interface EngineOptions {
 
 const SENTENCE_END = /[।.!?]\s|[।.!?]$/;
 
+/** Localized opening line spoken on pickup when no greeting was passed in metadata. */
+function defaultGreeting(shortLang: string): string {
+  const lang = shortLang.split('-')[0];
+  const greetings: Record<string, string> = {
+    mr: 'नमस्कार! ॲग्रोडेस्क कडून बोलतोय. तुम्हाला ट्रॅक्टरबद्दल माहिती हवी आहे का?',
+    hi: 'नमस्ते! मैं ॲग्रोडेस्क से बोल रहा हूँ। क्या आपको ट्रैक्टर के बारे में जानकारी चाहिए?',
+    en: 'Hello! This is AgroDesk calling. Would you like information about our tractors?',
+  };
+  return greetings[lang] ?? greetings.mr;
+}
+
 export class AgroDeskVoiceEngine implements VoiceEngine {
   private readonly stt: SarvamSttSession;
   private readonly tts: SarvamTtsFramer;
   private readonly responder: Responder;
   private readonly log: NonNullable<EngineOptions['logger']>;
   private readonly greeting: string;
+  private readonly shortLang: string;
 
   private replyAudioCb: (pcm: PcmChunk) => void = () => {};
   private bargeInCb: () => void = () => {};
@@ -45,6 +57,7 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
   constructor(opts: EngineOptions) {
     const shortLang = opts.language ?? 'mr';
     const sttLang = shortLang.includes('-') ? shortLang : `${shortLang}-IN`;
+    this.shortLang = shortLang;
     this.log = opts.logger ?? console;
     this.greeting = opts.greeting ?? '';
     this.tts = new SarvamTtsFramer(shortLang);
@@ -67,18 +80,26 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
   }
 
   async start(_format: AudioFormat): Promise<void> {
-    await this.stt.start();
-    // Outbound calls: greet as soon as the callee picks up so there is no dead air.
-    if (this.greeting.trim()) {
-      const myTurn = ++this.turnToken;
-      this.speaking = true;
-      try {
-        await this.speak(this.greeting.trim(), myTurn);
-      } catch (err) {
-        this.log.error('[voice-engine] greeting failed', err);
-      } finally {
-        if (myTurn === this.turnToken) this.speaking = false;
-      }
+    // 1. Greet FIRST so the caller always hears the agent on pickup — even before
+    //    STT is up and even if STT is unavailable. Falls back to a default line
+    //    when no greeting arrived via call metadata.
+    const greeting = this.greeting.trim() || defaultGreeting(this.shortLang);
+    const myTurn = ++this.turnToken;
+    this.speaking = true;
+    try {
+      await this.speak(greeting, myTurn);
+    } catch (err) {
+      this.log.error('[voice-engine] greeting failed', err);
+    } finally {
+      if (myTurn === this.turnToken) this.speaking = false;
+    }
+
+    // 2. STT is best-effort. A Sarvam error (e.g. 403) must NOT crash the process
+    //    or drop the call — log it and keep the line open with the greeting.
+    try {
+      await this.stt.start();
+    } catch (err) {
+      this.log.error('[voice-engine] STT unavailable — continuing without live transcription', err);
     }
   }
 

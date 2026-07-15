@@ -101,7 +101,11 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
           engine = createEngine({ callId: event.callId, metadata: event.metadata });
           engine.onReplyAudio((pcm) => session.sendAudioChunk(pcm));
           engine.onBargeIn(() => session.clearAudio());
-          void engine.start(event.format);
+          // Never let an engine start-up rejection become an unhandled rejection
+          // (Node would crash the whole process, killing every call + the API).
+          Promise.resolve(engine.start(event.format)).catch((err) =>
+            log.error('[telephony] engine start failed', err),
+          );
           break;
         case 'audio.received':
           engine?.handleCallerAudio(event.chunk);
