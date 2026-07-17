@@ -168,6 +168,9 @@ async function placeStreamingCall(opts: {
   greeting: string;
   dealerId: string;
   contactId?: string;
+  contactName?: string;
+  dealerName?: string;
+  dealerCity?: string;
 }): Promise<string> {
   const from = process.env.PLIVO_FROM_NUMBER ?? '';
   const q = new URLSearchParams({
@@ -175,6 +178,9 @@ async function placeStreamingCall(opts: {
     contactId: opts.contactId ?? '',
     language: opts.language,
     greeting: opts.greeting,
+    contactName: opts.contactName ?? '',
+    dealerName: opts.dealerName ?? '',
+    dealerCity: opts.dealerCity ?? '',
   });
   const answerUrl = `${BASE_URL}/api/telephony/answer?${q.toString()}`;
   const provider = getTelephonyProvider(); // throws a clear error if creds are missing
@@ -265,7 +271,10 @@ async function handleVoiceCall(data: QueueJobData) {
       (await buildStreamingGreeting(langName, calleeName, dealerName, dealerCity, caseId ? 'recovery' : 'sales'));
 
     console.log(`[worker] Placing ${TELEPHONY_PROVIDER} streaming call to ${phone}`);
-    const callId = await placeStreamingCall({ to: phone, language, greeting, dealerId: data.dealer_id, contactId });
+    const callId = await placeStreamingCall({
+      to: phone, language, greeting, dealerId: data.dealer_id, contactId,
+      contactName: calleeName, dealerName, dealerCity,
+    });
     console.log(`[worker] Streaming call placed — ${TELEPHONY_PROVIDER} callId: ${callId}`);
 
     if (contactId) {

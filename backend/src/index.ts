@@ -404,6 +404,9 @@ app.post('/api/telephony/answer', (req, res) => {
       contactId: String(q.contactId ?? ''),
       language: String(q.language ?? ''),
       greeting: String(q.greeting ?? ''),
+      contactName: String(q.contactName ?? ''),
+      dealerName: String(q.dealerName ?? ''),
+      dealerCity: String(q.dealerCity ?? ''),
     });
     const xml = getTelephonyProvider().buildAnswerResponse(wssUrl, { token });
     res.setHeader('Content-Type', 'text/xml');

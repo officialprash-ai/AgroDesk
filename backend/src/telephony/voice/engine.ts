@@ -11,7 +11,12 @@ import type { AudioFormat, PcmChunk } from '../types.js';
 import type { VoiceEngine } from '../bridge.js';
 import { SarvamSttSession } from './stt.js';
 import { SarvamTtsFramer } from './tts.js';
-import { GeminiVoiceResponder, type Responder } from './responder.js';
+import { GeminiVoiceResponder, buildVoiceSystemPrompt, type Responder } from './responder.js';
+
+const LANG_NAMES: Record<string, string> = {
+  mr: 'Marathi', hi: 'Hindi', en: 'English', gu: 'Gujarati', pa: 'Punjabi',
+  ta: 'Tamil', te: 'Telugu', kn: 'Kannada', bn: 'Bengali',
+};
 
 export interface EngineOptions {
   callId: string;
@@ -84,7 +89,18 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
     this.log = opts.logger ?? console;
     this.greeting = opts.greeting ?? '';
     this.tts = new SarvamTtsFramer(shortLang);
-    this.responder = opts.responder ?? new GeminiVoiceResponder();
+    // Build a personalized, conversational brain from the call metadata so the
+    // agent reacts to the caller instead of reciting. The opener/script is passed
+    // as the call goal so replies stay on-message but natural.
+    const md = opts.metadata ?? {};
+    const system = buildVoiceSystemPrompt({
+      langName: LANG_NAMES[shortLang.split('-')[0]] ?? 'Marathi',
+      dealerName: md.dealerName,
+      dealerCity: md.dealerCity,
+      contactName: md.contactName,
+      goal: md.greeting || this.greeting,
+    });
+    this.responder = opts.responder ?? new GeminiVoiceResponder(system);
     this.stt = new SarvamSttSession(
       { language: sttLang },
       {
@@ -106,16 +122,22 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
     // 1. Greet FIRST so the caller always hears the agent on pickup — even before
     //    STT is up and even if STT is unavailable. Falls back to a default line
     //    when no greeting arrived via call metadata.
-    const greeting = this.greeting.trim() || defaultGreeting(this.shortLang);
+    const fullGreeting = this.greeting.trim() || defaultGreeting(this.shortLang);
+    // Speak only a SHORT opener (first 1-2 sentences) so the call starts as a
+    // conversation, not a monologue. The rest of the script is context the brain
+    // uses to steer replies naturally.
+    const openerSentences = splitSentences(sanitizeForSpeech(fullGreeting)).slice(0, 2);
+    const opener = openerSentences.join(' ');
     const myTurn = ++this.turnToken;
     this.speaking = true;
     try {
-      // Speak sentence-by-sentence so the first words play in ~1s instead of
-      // waiting for the whole (long) script to synthesize.
-      for (const sentence of splitSentences(greeting)) {
+      // Speak sentence-by-sentence so the first words play in ~1s.
+      for (const sentence of openerSentences) {
         if (myTurn !== this.turnToken) break;
         if (!(await this.speak(sentence, myTurn))) break;
       }
+      // Let the brain know what it just said, for coherent follow-ups.
+      this.responder.seedAssistant?.(opener);
     } catch (err) {
       this.log.error('[voice-engine] greeting failed', err);
     } finally {

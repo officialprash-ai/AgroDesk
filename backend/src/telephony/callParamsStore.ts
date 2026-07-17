@@ -11,6 +11,9 @@ export interface CallParams {
   language?: string;
   contactId?: string;
   dealershipId?: string;
+  contactName?: string;
+  dealerName?: string;
+  dealerCity?: string;
 }
 
 const TTL_MS = 5 * 60_000; // a call connects within seconds; 5 min is ample
