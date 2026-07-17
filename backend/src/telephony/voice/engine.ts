@@ -30,6 +30,29 @@ export interface EngineOptions {
 
 const SENTENCE_END = /[।.!?]\s|[।.!?]$/;
 
+/**
+ * Strip anything that shouldn't be spoken aloud: bracketed stage directions and
+ * placeholders like [रुका], [pause], [Customer Name], [Your Name], and collapse
+ * whitespace/newlines. Without this the TTS literally reads "रुका" etc.
+ */
+function sanitizeForSpeech(text: string): string {
+  return text
+    .replace(/[[（(]\s*(रुका|रुकें|pause|थांबा|अगर.*?|if.*?|customer name|your name)\s*[\])）]/gi, ' ')
+    .replace(/\[[^\]]*\]/g, ' ') // any remaining [ ... ] directions/placeholders
+    .replace(/\s*\n+\s*/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([।.,!?])/g, '$1')
+    .trim();
+}
+
+/** Split text into sentence-sized chunks so the first chunk can play immediately. */
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[।.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /** Localized opening line spoken on pickup when no greeting was passed in metadata. */
 function defaultGreeting(shortLang: string): string {
   const lang = shortLang.split('-')[0];
@@ -87,7 +110,12 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
     const myTurn = ++this.turnToken;
     this.speaking = true;
     try {
-      await this.speak(greeting, myTurn);
+      // Speak sentence-by-sentence so the first words play in ~1s instead of
+      // waiting for the whole (long) script to synthesize.
+      for (const sentence of splitSentences(greeting)) {
+        if (myTurn !== this.turnToken) break;
+        if (!(await this.speak(sentence, myTurn))) break;
+      }
     } catch (err) {
       this.log.error('[voice-engine] greeting failed', err);
     } finally {
@@ -148,7 +176,9 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
   }
 
   private async speak(sentence: string, myTurn: number): Promise<boolean> {
-    for await (const pcm of this.tts.stream(sentence)) {
+    const clean = sanitizeForSpeech(sentence);
+    if (!clean) return true; // nothing speakable (e.g. was only a [direction])
+    for await (const pcm of this.tts.stream(clean)) {
       if (myTurn !== this.turnToken) return false;
       this.replyAudioCb(pcm);
     }

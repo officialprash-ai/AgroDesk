@@ -93,7 +93,11 @@ export class SarvamSttSession {
     while (this.audioBuf.length >= SarvamSttSession.FRAME_BYTES) {
       const frameBuf = this.audioBuf.subarray(0, SarvamSttSession.FRAME_BYTES);
       this.audioBuf = this.audioBuf.subarray(SarvamSttSession.FRAME_BYTES);
-      const frame = JSON.stringify({ audio: { data: Buffer.from(frameBuf).toString('base64') } });
+      // Sarvam requires encoding + sample_rate inside every audio message
+      // (SarvamAppRequest validation), not just on the connection URL.
+      const frame = JSON.stringify({
+        audio: { data: Buffer.from(frameBuf).toString('base64'), encoding: 'pcm_s16le', sample_rate: 8000 },
+      });
       if (this.ready && this.ws) this.ws.send(frame);
       else this.queue.push(frame);
     }

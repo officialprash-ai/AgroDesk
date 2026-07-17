@@ -200,11 +200,16 @@ async function buildStreamingGreeting(
   dealerCity: string,
   kind: 'sales' | 'recovery',
 ): Promise<string> {
+  const rules =
+    `Output ONLY the exact words to be spoken aloud, as one short paragraph. ` +
+    `Do NOT use square brackets, parentheses, stage directions (like [pause]/[रुका]), ` +
+    `placeholders (like [Your Name]/[Customer Name]), headings, or line breaks. ` +
+    `Refer to the caller as being from ${dealerName} — do not insert a name placeholder.`;
   const prompt =
     kind === 'recovery'
-      ? `Write a polite spoken phone-call script in ${langName} for a tractor dealership representative calling a customer named ${calleeName || 'the customer'} about a pending payment. Warm and respectful, no threats. 40-70 words, natural spoken ${langName}, ask when they can clear the amount. Return ONLY the spoken words (no stage directions).`
-      : `Write a warm spoken cold-call script in ${langName} for a salesperson from ${dealerName}${dealerCity ? ' in ' + dealerCity : ''} calling a farmer named ${calleeName || 'the farmer'} about tractors. Introduce yourself and the dealership, mention a helpful offer, and invite them to visit the showroom. 50-80 words, natural spoken ${langName}. Return ONLY the spoken words (no stage directions, no placeholders in brackets).`;
-  const script = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 400 }).catch(() => '');
+      ? `Write a short, polite spoken phone-call opener in ${langName} for a ${dealerName} representative calling ${calleeName || 'the customer'} about a pending tractor-loan payment. Warm and respectful, no threats. 25-40 words. Ask when they can clear the amount. ${rules}`
+      : `Write a short, warm spoken cold-call opener in ${langName} for a salesperson from ${dealerName}${dealerCity ? ' in ' + dealerCity : ''} calling ${calleeName || 'the farmer'} about tractors. Greet them, say there is a good offer, and invite them to visit the showroom. 25-40 words. ${rules}`;
+  const script = await geminiText({ messages: [{ role: 'user', content: prompt }], maxTokens: 200 }).catch(() => '');
   return script?.trim() || 'नमस्कार! ॲग्रोडेस्क कडून बोलतोय. तुम्हाला ट्रॅक्टरबद्दल माहिती हवी आहे का?';
 }
 
