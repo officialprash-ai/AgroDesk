@@ -126,15 +126,15 @@ const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error'
   if (loading || !form) return <div className="py-10 text-center text-[var(--text-muted)]">{t('common.loading')}</div>;
 
   const field = (key: string, label: string, hint: string, type = 'tel') => (
-    <div>
-      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{label}</label>
+    <div className="min-w-0">
+      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{label}</label>
       <input
         type={type}
         value={form[key]}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:border-brand-400"
+        className="w-full px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-brand-400"
       />
-      <p className="text-xs text-[var(--text-muted)] mt-1">{hint}</p>
+      <p className="text-[11px] leading-snug text-[var(--text-muted)] mt-1">{hint}</p>
     </div>
   );
 
@@ -149,17 +149,21 @@ const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error'
     setSaving(false);
   };
 
+  // Two columns on anything wider than mobile so the whole form — including the
+  // Save button — fits above the fold on a 768px-tall laptop.
   return (
-    <Card className="p-6 max-w-lg space-y-4">
+    <Card className="p-5 max-w-3xl space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">
         {t('support.routing.intro')}
       </p>
-      {field('mechanic_phone', t('support.routing.mechanic'), t('support.routing.mechanicHint'))}
-      {field('technician_phone', t('support.routing.technician'), t('support.routing.technicianHint'))}
-      {field('dealer_phone', t('support.routing.dealer'), t('support.routing.dealerHint'))}
-      <div className="grid grid-cols-2 gap-3">
-        {field('office_hours_start', t('support.routing.officeStart'), t('support.routing.officeHint'), 'time')}
-        {field('office_hours_end', t('support.routing.officeEnd'), t('support.routing.afterHoursHint'), 'time')}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+        {field('mechanic_phone', t('support.routing.mechanic'), t('support.routing.mechanicHint'))}
+        {field('technician_phone', t('support.routing.technician'), t('support.routing.technicianHint'))}
+        {field('dealer_phone', t('support.routing.dealer'), t('support.routing.dealerHint'))}
+        <div className="grid grid-cols-2 gap-3">
+          {field('office_hours_start', t('support.routing.officeStart'), t('support.routing.officeHint'), 'time')}
+          {field('office_hours_end', t('support.routing.officeEnd'), t('support.routing.afterHoursHint'), 'time')}
+        </div>
       </div>
       <Button onClick={save} loading={saving}>{t('common.save')}</Button>
     </Card>
