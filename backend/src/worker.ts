@@ -38,6 +38,7 @@ import { geminiText } from './lib/llm.js';
 import { sendWhatsApp, sendWhatsAppTemplate } from './lib/whatsapp.js';
 import { sendSMS, DLTTemplateKey } from './lib/sms.js';
 import { storeAudio } from './lib/audioStore.js';
+import { consumeQuota } from './lib/usageLimits.js';
 
 // ─── Consent logging ─────────────────────────────────────────
 
@@ -170,6 +171,18 @@ async function placeStreamingCall(opts: {
     dealerCity: opts.dealerCity ?? '',
   });
   const answerUrl = `${BASE_URL}/api/telephony/answer?${q.toString()}`;
+
+  // AI call quota (Sovereign Vault plan limits). Consumed before dialling —
+  // an initiated call costs money whether or not it connects.
+  if (opts.dealerId) {
+    const callQuota = await consumeQuota(opts.dealerId, 'ai_calls');
+    if (!callQuota.allowed) {
+      throw new Error(
+        `Plan limit reached: ${callQuota.used}/${callQuota.limit} AI calls this month for dealer ${opts.dealerId}`,
+      );
+    }
+  }
+
   const provider = getTelephonyProvider(); // throws a clear error if creds are missing
   const handle = await provider.initiateCall({
     to: toE164India(opts.to),
@@ -372,6 +385,15 @@ async function handleWhatsApp(data: QueueJobData) {
   }
   if (!message) throw new Error('No message provided in job payload');
 
+  // Plan limit (set in the Sovereign Vault). Checked immediately before the
+  // send so a spent quota stops the spend rather than being noticed later.
+  const waQuota = await consumeQuota(data.dealer_id, 'whatsapp_msgs');
+  if (!waQuota.allowed) {
+    throw new Error(
+      `Plan limit reached: ${waQuota.used}/${waQuota.limit} WhatsApp messages this month for dealer ${data.dealer_id}`,
+    );
+  }
+
   console.log(`[worker] Sending WhatsApp to ${phone}`);
   const { sid } = await sendWhatsApp(phone, message);
   console.log(`[worker] WhatsApp sent — Twilio SID: ${sid}`);
@@ -496,6 +518,13 @@ async function handleSMS(data: QueueJobData) {
   const contact = await prisma.contact.findUnique({ where: { id: contactId } });
   if (!contact) throw new Error(`Contact ${contactId} not found`);
   if (!contact.opt_in_sms) throw new Error(`Contact ${contactId} has not opted in to SMS`);
+
+  const smsQuota = await consumeQuota(data.dealer_id, 'sms');
+  if (!smsQuota.allowed) {
+    throw new Error(
+      `Plan limit reached: ${smsQuota.used}/${smsQuota.limit} SMS this month for dealer ${data.dealer_id}`,
+    );
+  }
 
   console.log(`[worker] Sending SMS to ${contact.phone} (template: ${templateKey})`);
   const { request_id } = await sendSMS(contact.phone, templateKey, variables);

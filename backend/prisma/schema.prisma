@@ -376,3 +376,33 @@ model SupportRouting {
   dealer Dealer @relation(fields: [dealer_id], references: [id])
   @@map("support_routing")
 }
+
+// Platform-wide runtime configuration, owned by the Sovereign Vault ops panel
+// and read by this backend. Key/value so new config groups don't need a
+// migration. Current keys: "providers", "plan_limits".
+//
+// This backend owns the migration; the ops repo declares a read/write subset.
+model PlatformConfig {
+  key        String   @id
+  value      Json
+  updated_by String?
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("platform_config")
+}
+
+// Per-dealer monthly usage counters backing plan-limit enforcement.
+// One row per (dealer, metric, period) where period is 'YYYY-MM'.
+model UsageCounter {
+  id         String   @id @default(cuid())
+  dealer_id  String
+  metric     String
+  period     String
+  count      Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@unique([dealer_id, metric, period])
+  @@index([period])
+  @@map("usage_counter")
+}

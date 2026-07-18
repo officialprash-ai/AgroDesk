@@ -21,6 +21,7 @@ import { PlivoAdapter } from './adapters/plivo.js';
 import { ExotelAdapter } from './adapters/exotel.js';
 import { createAgroDeskEngine } from './voice/engine.js';
 import { takeCallParams } from './callParamsStore.js';
+import { getProvidersSync } from '../lib/platformConfig.js';
 
 /** The AI half of a call. One instance per call. */
 export interface VoiceEngine {
@@ -79,8 +80,38 @@ export function createTelephonyProvider(
 }
 
 let singleton: TelephonyProvider | null = null;
+let singletonName: TelephonyProviderName | null = null;
+
+/**
+ * Current telephony provider.
+ *
+ * The active provider comes from platform_config (set in the Sovereign Vault),
+ * falling back to TELEPHONY_PROVIDER then 'plivo'. Reads the cached config
+ * snapshot — no DB round-trip per call — and rebuilds the adapter only when
+ * the selection actually changes, so a vault switch takes effect within the
+ * config cache TTL (~30s) without a redeploy.
+ *
+ * In-flight calls keep the adapter they started with; only new calls pick up
+ * the change.
+ */
 export function getTelephonyProvider(): TelephonyProvider {
-  if (!singleton) singleton = createTelephonyProvider();
+  const configured = getProvidersSync().voice as TelephonyProviderName;
+
+  if (singleton && singletonName === configured) return singleton;
+
+  try {
+    singleton = createTelephonyProvider(configured);
+    singletonName = configured;
+    console.log(`[telephony] provider set to "${configured}"`);
+  } catch (err) {
+    // Misconfigured target (e.g. Exotel selected but its credentials are
+    // missing). Keep serving with the existing adapter rather than failing
+    // the call; surface loudly so it gets fixed.
+    console.error(`[telephony] cannot switch to "${configured}":`, err);
+    if (singleton) return singleton;
+    throw err;
+  }
+
   return singleton;
 }
 
@@ -89,7 +120,9 @@ export function getTelephonyProvider(): TelephonyProvider {
  * VoiceEngine. Returns the WebSocketServer so callers can close it on shutdown.
  */
 export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): WebSocketServer {
-  const provider = getTelephonyProvider();
+  // NOTE: the provider is resolved per connection (below), not here. Resolving
+  // it once at mount time would pin the process to whichever provider was
+  // active at boot, so vault switches would need a redeploy to take effect.
   const createEngine =
     deps.createEngine ??
     ((ctx) =>
@@ -108,7 +141,10 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
     // echoes on the stream on top.
     const urlMeta = parseUrlQuery((req as { url?: string } | undefined)?.url);
     const stored = takeCallParams(urlMeta.token);
-    const session: CallSession = provider.handleStream(rawWs as unknown as TelephonyWebSocket);
+    // Resolved per call so a provider switch in the vault applies to new calls.
+    const session: CallSession = getTelephonyProvider().handleStream(
+      rawWs as unknown as TelephonyWebSocket,
+    );
     let engine: VoiceEngine | null = null;
 
     session.on((event) => {

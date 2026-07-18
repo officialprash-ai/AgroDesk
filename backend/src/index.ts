@@ -40,6 +40,7 @@ import { getAudio } from './lib/audioStore.js';
 import { buildExoML } from './lib/exotel.js';
 import { createServer } from 'http';
 import { attachTelephonyBridge, getTelephonyProvider } from './telephony/index.js';
+import { preloadPlatformConfig } from './lib/platformConfig.js';
 import { putCallParams } from './telephony/callParamsStore.js';
 
 // ─── ENV VALIDATION (fail fast) ─────────────────────────────
@@ -527,6 +528,12 @@ try {
 
 server.listen(PORT, () => {
   console.log(`AgroDesk API running on port ${PORT}`);
+  // Warm the platform_config cache so sync consumers (telephony provider
+  // selection) serve the vault's configured values rather than env defaults
+  // on the very first call. Non-fatal: the config layer falls back on failure.
+  preloadPlatformConfig().catch((err) =>
+    console.error('[platformConfig] preload failed, using fallbacks:', err),
+  );
 });
 
 export default app;
