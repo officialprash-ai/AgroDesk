@@ -76,20 +76,32 @@ app.use(helmet({
   },
 }));
 
+// Exact-origin allowlist. A wildcard *.vercel.app rule was previously used to
+// cover preview deploys, but combined with `credentials: true` it let ANY
+// Vercel-hosted site make credentialed requests to this API from a logged-in
+// dealer's browser. Preview URLs now go in EXTRA_CORS_ORIGINS explicitly.
+//
+// FRONTEND_URL must be set in production or no browser origin is allowed.
+const isProd = process.env.NODE_ENV === 'production';
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
+  ...(isProd ? [] : ['http://localhost:5173', 'http://localhost:3000']),
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ...(process.env.EXTRA_CORS_ORIGINS
+    ? process.env.EXTRA_CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : []),
 ];
-// Allow any *.vercel.app subdomain (covers preview + prod deployments)
-const VERCEL_RE = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+
+if (isProd && !process.env.FRONTEND_URL) {
+  console.warn('[cors] WARNING: NODE_ENV=production but FRONTEND_URL is unset — all browser origins will be rejected.');
+}
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || VERCEL_RE.test(origin)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`CORS: ${origin} not allowed`));
-    }
+    // No Origin header = non-browser client (webhooks, health checks, curl).
+    // Not a CSRF vector, since CSRF requires a browser-attached origin.
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS: ${origin} not allowed`));
   },
   credentials: true,
 }));
