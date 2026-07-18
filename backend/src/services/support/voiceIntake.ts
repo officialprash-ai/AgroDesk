@@ -28,6 +28,7 @@ const prisma = _prisma as any;
 import { textToSpeech } from '../../lib/sarvam.js';
 import { storeAudio } from '../../lib/audioStore.js';
 import { handleIntake } from './intake.js';
+import { supportCopy, fill } from '../../lib/supportStrings.js';
 
 const BASE_URL = (process.env.BACKEND_URL ?? 'https://agrodesk-production.up.railway.app').replace(/\/$/, '');
 
@@ -111,11 +112,14 @@ router.post('/answer', async (req, res) => {
       : null;
 
     // Recording consent (TRAI, non-negotiable) + greeting.
-    const consent = 'ही कॉल सेवेच्या दर्जासाठी रेकॉर्ड केली जात आहे. ';
+    // Prompts + the TTS voice both follow the dealer's configured language.
+    const lang = dealer.language ?? 'mr';
+    const copy = supportCopy(lang);
+    const consent = copy.consent;
     const greeting = contact
-      ? `नमस्कार ${contact.name}. काय काम होतं? कृपया सांगा.`
-      : 'नमस्कार. तुमचं नाव, ट्रॅक्टर आणि काय काम आहे ते कृपया सांगा.';
-    const audio = await speakUrl(consent + greeting);
+      ? fill(copy.greetKnown, { name: contact.name })
+      : copy.greetUnknown;
+    const audio = await speakUrl(consent + greeting, lang);
 
     const params = new URLSearchParams({
       token: (req.query.token as string) ?? '',
@@ -149,6 +153,8 @@ router.post('/capture', async (req, res) => {
 
     const dealer = await prisma.dealer.findUnique({ where: { id: dealerId } }).catch(() => null);
     const isDemo = dealer?.is_demo === true;
+    const lang = dealer?.language ?? 'mr';
+    const copy = supportCopy(lang);
 
     // Transcribe the recording (Marathi). Plivo recordings need Basic auth.
     let text = '';
@@ -173,7 +179,7 @@ router.post('/capture', async (req, res) => {
     const ticket = await handleIntake({
       dealerId,
       phone: fromPhone,
-      text: text || '(व्हॉइस कॉल — मजकूर उपलब्ध नाही)',
+      text: text || copy.voiceNoText,
       channel: 'CALL',
       externalCallId: callUuid || undefined,
       isDemo,
@@ -184,18 +190,18 @@ router.post('/capture', async (req, res) => {
     const routedPhone: string | null = ticket.routed_to_phone ?? null;
 
     // Repeat the note back for confirmation.
-    const confirmLine = `${ticket.note}, बरोबर? `;
+    const confirmLine = fill(copy.confirm, { note: String(ticket.note) });
 
     // Skip transfer when: demo dealer, outside office hours, or no target number.
     if (isDemo || !openHours || !routedPhone) {
-      const closing = 'नोंद झाली. आमचा माणूस तुम्हाला फोन करेल. धन्यवाद.';
-      const audio = await speakUrl(confirmLine + closing);
+      const closing = copy.closingNoTransfer;
+      const audio = await speakUrl(confirmLine + closing, lang);
       return xml(res, `${playOrSpeak(audio, confirmLine + closing)}<Hangup/>`);
     }
 
     // Bridge to the routed staff member.
-    const bridgeLine = confirmLine + 'जोडून देतो, एक मिनिट.';
-    const audio = await speakUrl(bridgeLine);
+    const bridgeLine = confirmLine + copy.bridging;
+    const audio = await speakUrl(bridgeLine, lang);
     const params = new URLSearchParams({ token: (req.query.token as string) ?? '', request: ticket.id });
     const dialAction = `${BASE_URL}/api/support/voice/transfer-status?${params.toString()}`;
 
@@ -208,7 +214,7 @@ router.post('/capture', async (req, res) => {
   } catch (err) {
     console.error('[voiceIntake/capture]', err);
     // Even on error the ticket may already exist; just close politely.
-    xml(res, '<Speak language="hi-IN">धन्यवाद.</Speak><Hangup/>');
+    xml(res, `<Speak language="hi-IN">${escapeXml(supportCopy('mr').thanks)}</Speak><Hangup/>`);
   }
 });
 
@@ -226,9 +232,17 @@ router.post('/transfer-status', async (req, res) => {
       return xml(res, '<Hangup/>');
     }
 
-    // No answer / busy / failed — leave transferred=false, reassure the caller.
-    const audio = await speakUrl('माफ करा, आमचा माणूस आत्ता उपलब्ध नाही. तो तुम्हाला लवकरच फोन करेल.');
-    return xml(res, `${playOrSpeak(audio, 'आमचा माणूस तुम्हाला फोन करेल.')}<Hangup/>`);
+    // No answer / busy / failed — leave transferred=false, reassure the caller
+    // in the dealer's language (resolved via the ticket).
+    const ticket = requestId
+      ? await prisma.supportRequest
+          .findUnique({ where: { id: requestId }, include: { dealer: { select: { language: true } } } })
+          .catch(() => null)
+      : null;
+    const lang = ticket?.dealer?.language ?? 'mr';
+    const copy = supportCopy(lang);
+    const audio = await speakUrl(copy.staffUnavailable, lang);
+    return xml(res, `${playOrSpeak(audio, copy.staffUnavailable)}<Hangup/>`);
   } catch (err) {
     console.error('[voiceIntake/transfer-status]', err);
     xml(res, '<Hangup/>');

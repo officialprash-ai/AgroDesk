@@ -27,6 +27,7 @@ import { randomUUID } from 'crypto';
 
 import { agentQueue, deferJob, QueueJobData } from './lib/queue.js';
 import { isQuietHours, msUntilAllowedWindow, QUIET_HOURS_GATED_TYPES } from './lib/quietHours.js';
+import { supportCopy } from './lib/supportStrings.js';
 import { prisma as _prisma } from './lib/prisma.js';
 const prisma = _prisma as any;
 
@@ -582,17 +583,13 @@ async function handleSendToAccountant(data: QueueJobData) {
  *
  * Expected payload: { request_id }
  */
-const SUPPORT_TYPE_MR: Record<string, string> = {
-  SERVICE: 'सर्विस', REPAIR: 'दुरुस्ती', OTHER: 'इतर काम', UNSURE: 'अनिश्चित',
-};
-
 async function handleSupportNotify(data: QueueJobData) {
   const requestId = data.payload.request_id as string;
   if (!requestId) throw new Error('support_notify job requires request_id in payload');
 
   const ticket = await prisma.supportRequest.findUnique({
     where: { id: requestId },
-    include: { contact: true },
+    include: { contact: true, dealer: { select: { language: true } } },
   });
   if (!ticket) throw new Error(`SupportRequest ${requestId} not found`);
 
@@ -604,16 +601,17 @@ async function handleSupportNotify(data: QueueJobData) {
   }
 
   const who = ticket.contact?.name || ticket.caller_name || ticket.phone;
-  const typeLabel = SUPPORT_TYPE_MR[ticket.type] ?? ticket.type;
+  const copy = supportCopy(ticket.dealer?.language); // staff alert in the dealer's language
+  const typeLabel = copy.types[ticket.type as keyof typeof copy.types] ?? ticket.type;
   const base = (process.env.FRONTEND_URL ?? 'https://frontend-sepia-five-70.vercel.app').replace(/\/$/, '');
   const link = `${base}/support?ticket=${ticket.id}`;
 
   const message =
-    `🔧 नवीन विनंती (${typeLabel})\n` +
-    `ग्राहक: ${who}\n` +
-    `फोन: ${ticket.phone}\n` +
-    `तपशील: ${ticket.note}\n\n` +
-    `पहा: ${link}`;
+    `🔧 ${copy.newRequest} (${typeLabel})\n` +
+    `${copy.customer}: ${who}\n` +
+    `${copy.phone}: ${ticket.phone}\n` +
+    `${copy.details}: ${ticket.note}\n\n` +
+    `${copy.view}: ${link}`;
 
   console.log(`[worker] Notifying support staff ${ticket.routed_to} (${ticket.routed_to_phone}) — ticket ${ticket.id}`);
 

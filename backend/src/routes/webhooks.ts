@@ -5,6 +5,7 @@ import { sendWhatsApp } from '../lib/whatsapp.js';
 import { handleIntake } from '../services/support/intake.js';
 import { enqueueSupportNotify } from '../services/support/notify.js';
 import { speechToText } from '../lib/sarvam.js';
+import { supportCopy } from '../lib/supportStrings.js';
 import { uploadToS3, isS3Configured } from '../lib/s3.js';
 import { randomUUID } from 'crypto';
 
@@ -278,7 +279,10 @@ router.post('/sms', async (req, res) => {
 // the reply/notify fails, the ticket still exists. Idempotent on MessageSid
 // (WhatsApp retries). Demo dealers: ticket is created, but NO real WhatsApp is
 // sent (neither the customer ack nor the staff notify).
-const SUPPORT_ACK_MR = 'नोंद झाली. आमचा माणूस फोन करेल.';
+//
+// All customer-facing copy follows the dealer's configured language — see
+// lib/supportStrings.ts. Never hardcode Marathi here; AgroDesk sells beyond
+// Maharashtra.
 
 /** Download a Twilio media resource (requires Basic auth with the account creds). */
 async function downloadTwilioMedia(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
@@ -315,6 +319,7 @@ router.post('/whatsapp-support', async (req, res) => {
 
     const fromPhone = (From ?? '').replace('whatsapp:', '');
     const isDemo = dealer.is_demo === true;
+    const copy = supportCopy(dealer.language); // customer-facing text in the dealer's language
 
     // Idempotency: if we've already logged this MessageSid, ack silently.
     if (MessageSid) {
@@ -377,7 +382,7 @@ router.post('/whatsapp-support', async (req, res) => {
     const ticket = await handleIntake({
       dealerId: dealer.id,
       phone: fromPhone,
-      text: text || '(फक्त फोटो पाठवला)',
+      text: text || copy.photoOnly,
       channel: 'WHATSAPP',
       mediaUrls,
       externalCallId: MessageSid,
@@ -390,7 +395,7 @@ router.post('/whatsapp-support', async (req, res) => {
       res.status(200).send('<Response/>');
     } else {
       // Inline TwiML reply — no extra API round-trip, stays inside the window.
-      res.status(200).send(`<Response><Message>${SUPPORT_ACK_MR}</Message></Response>`);
+      res.status(200).send(`<Response><Message>${copy.ack}</Message></Response>`);
     }
 
     // ── Notify staff AFTER the ticket exists (skip for demo) ───
