@@ -139,6 +139,24 @@ export const api = {
       req<{ jobs: any[]; total: number }>(`/api/jobs?dealer_id=${dealer_id}`),
   },
 
+  support: {
+    summary: () => req<{ newCount: number; untransferredCount: number; oldestNewAt: string | null }>('/api/support/summary'),
+    list: (params?: { status?: string; type?: string; page?: number }) => {
+      const q = new URLSearchParams(
+        Object.fromEntries(Object.entries(params ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])),
+      );
+      const qs = q.toString();
+      return req<{ requests: any[]; total: number; page: number; pageSize: number }>(`/api/support/requests${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => req<{ request: any }>(`/api/support/requests/${id}`),
+    update: (id: string, data: { status?: string; type?: string; machineId?: string | null }) =>
+      req<{ request: any; success: boolean }>(`/api/support/requests/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    create: (data: { phone: string; note: string; type?: string; caller_name?: string; contact_id?: string | null; machine_id?: string | null }) =>
+      req<{ request: any; success: boolean }>('/api/support/requests', { method: 'POST', body: JSON.stringify(data) }),
+    routing: () => req<{ routing: any }>('/api/support/routing'),
+    saveRouting: (data: Record<string, unknown>) => req<{ routing: any; success: boolean }>('/api/support/routing', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
   onboarding: {
     brands: () => req<{ brands: { id: string; name: string; category: string }[] }>('/api/onboarding/brands'),
     status: () => req<{ dealer: any; checklist: { profile: boolean; brands: boolean; plan: boolean }; complete: boolean }>('/api/onboarding/status'),

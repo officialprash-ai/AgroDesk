@@ -29,6 +29,8 @@ import authRouter from './routes/auth.js';
 import webhooksRouter from './routes/webhooks.js';
 import conversationsRouter from './routes/conversations.js';
 import onboardingRouter from './routes/onboarding.js';
+import supportRouter from './routes/support.js';
+import supportVoiceRouter from './services/support/voiceIntake.js';
 import { authMiddleware } from './middleware/auth.js';
 import type { AuthRequest } from './middleware/auth.js';
 import { demoGuard } from './middleware/demoGuard.js';
@@ -205,9 +207,13 @@ app.use('/api/dashboard', authMiddleware, demoGuard, dashboardRouter);
 app.use('/api/documents', authMiddleware, demoGuard, documentsRouter);
 app.use('/api/conversations', authMiddleware, conversationsRouter);
 app.use('/api/onboarding', authMiddleware, onboardingRouter);
+app.use('/api/support', authMiddleware, demoGuard, supportRouter);
 
 // ─── WEBHOOKS (Twilio-signed, no JWT) ───────────────────────
 app.use('/api/webhooks', twilioWebhookAuth, webhooksRouter);
+
+// ─── SUPPORT INTAKE — voice IVR (Plivo, public; token-gated internally) ──
+app.use('/api/support/voice', supportVoiceRouter);
 
 // ─── AI — SCRIPT GENERATOR (protected) ─────────────────────
 // LLM calls go through geminiText (src/lib/llm.ts).

@@ -40,6 +40,10 @@ model Dealer {
   documents    Document[]
   accountants  Accountant[]
   agent_jobs   AgentJob[]
+  // ─── Support Intake module ─────────────────────────────────
+  machines         Machine[]
+  support_requests SupportRequest[]
+  support_routing  SupportRouting?
   @@map("dealers")
 }
 
@@ -79,6 +83,8 @@ model Contact {
   consents          Consent[]
   conversations     Conversation[]
   campaigns         CampaignContact[]
+  machines          Machine[]
+  support_requests  SupportRequest[]
   @@map("contacts")
 }
 
@@ -278,4 +284,95 @@ model AuditLog {
 
   @@index([ts])
   @@map("audit_log")
+}
+
+// ─── Support Intake module ───────────────────────────────────
+// Captures every service / repair / enquiry request that arrives by phone or
+// WhatsApp as a ticket BEFORE any call transfer, so a request is never lost.
+//
+// Note on conventions (matches the rest of this schema):
+//  - The "customer" is the existing `Contact` model — there is no separate
+//    Customer table. `contact_id` is null when the caller is unknown.
+//  - status / type / channel / routed_to are TEXT columns with documented
+//    string unions (same style as Conversation.status/channel), not PG enums.
+//  - Tenant isolation is application-level via `dealer_id` (see routes), the
+//    same pattern used everywhere else — there is no Postgres RLS in this repo.
+
+// A tractor owned by a Contact. Lets a ticket be tied to a specific machine
+// when the caller/AI identifies it unambiguously.
+model Machine {
+  id            String    @id @default(cuid())
+  dealer_id     String
+  contact_id    String
+  make          String
+  model         String
+  reg_no        String?
+  chassis_no    String?
+  delivery_date DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  dealer   Dealer           @relation(fields: [dealer_id], references: [id])
+  contact  Contact          @relation(fields: [contact_id], references: [id])
+  requests SupportRequest[]
+
+  @@index([dealer_id])
+  @@index([contact_id])
+  @@index([reg_no])
+  @@map("machines")
+}
+
+// The support ticket. Created first, always — transfer/notify happens after.
+model SupportRequest {
+  id          String  @id @default(cuid())
+  dealer_id   String
+  contact_id  String? // null when the caller is unknown
+  machine_id  String?
+  phone       String  // always present — the source of truth for identity
+  caller_name String? // captured by AI when the contact is unknown
+
+  type    String // SERVICE | REPAIR | OTHER | UNSURE
+  status  String @default("NEW") // NEW | SEEN | IN_PROGRESS | DONE
+  channel String // CALL | WHATSAPP | MANUAL
+
+  note    String  // verbatim, in Marathi
+  note_en String? // optional translation for search
+
+  routed_to        String?  // MECHANIC | TECHNICIAN | DEALER
+  routed_to_phone  String?
+  transferred      Boolean  @default(false) // did the handoff actually connect?
+
+  external_call_id String?  @unique // Plivo call UUID / WhatsApp message id — idempotency key
+  media_urls       String[] @default([]) // WhatsApp photos
+
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  seen_at    DateTime?
+  closed_at  DateTime?
+
+  dealer  Dealer   @relation(fields: [dealer_id], references: [id])
+  contact Contact? @relation(fields: [contact_id], references: [id])
+  machine Machine? @relation(fields: [machine_id], references: [id])
+
+  @@index([dealer_id, status])
+  @@index([dealer_id, type])
+  @@index([dealer_id, created_at])
+  @@index([phone])
+  @@map("support_requests")
+}
+
+// Per-dealer routing targets + office hours (IST, 24h "HH:MM").
+model SupportRouting {
+  id                 String   @id @default(cuid())
+  dealer_id          String   @unique
+  mechanic_phone     String?
+  technician_phone   String?
+  dealer_phone       String?
+  office_hours_start String   @default("09:00")
+  office_hours_end   String   @default("19:00")
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  dealer Dealer @relation(fields: [dealer_id], references: [id])
+  @@map("support_routing")
 }

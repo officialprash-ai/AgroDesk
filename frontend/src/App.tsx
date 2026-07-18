@@ -25,6 +25,7 @@ const Pipeline      = lazy(() => import('./pages/crm/Pipeline').then(m => ({ def
 const SalesEngine   = lazy(() => import('./pages/sales-engine/SalesEngine').then(m => ({ default: m.SalesEngine })));
 const UsedTractor   = lazy(() => import('./pages/used-tractor/UsedTractor').then(m => ({ default: m.UsedTractor })));
 const MoneyRecovery = lazy(() => import('./pages/money-recovery/MoneyRecovery').then(m => ({ default: m.MoneyRecovery })));
+const Support       = lazy(() => import('./pages/support/Support').then(m => ({ default: m.Support })));
 const ColdCalling   = lazy(() => import('./pages/cold-calling/ColdCalling').then(m => ({ default: m.ColdCalling })));
 const AISalesman    = lazy(() => import('./pages/ai-salesman/AISalesman').then(m => ({ default: m.AISalesman })));
 const AIAccountant  = lazy(() => import('./pages/ai-accountant/AIAccountant').then(m => ({ default: m.AIAccountant })));
@@ -189,6 +190,7 @@ function App() {
                 <Route path="/sales-engine" element={<SalesEngine />} />
                 <Route path="/used-tractor" element={<UsedTractor />} />
                 <Route path="/money-recovery" element={<MoneyRecovery />} />
+                <Route path="/support" element={<Support />} />
                 <Route path="/cold-calling" element={<ColdCalling />} />
                 <Route path="/ai-salesman" element={<AISalesman />} />
                 <Route path="/ai-accountant" element={<AIAccountant />} />

@@ -84,6 +84,43 @@ export async function textToSpeech(text: string, language = 'mr'): Promise<Buffe
   return combined;
 }
 
+/**
+ * Speech-to-Text (Sarvam Saarika) — transcribe a WhatsApp voice note or any
+ * short audio clip. Used by the Support Intake WhatsApp webhook so a farmer can
+ * describe a breakdown by voice note instead of typing.
+ *
+ * @param audio    Raw audio bytes (ogg/opus from WhatsApp, wav, mp3, etc.)
+ * @param mimeType Content-Type of the audio (e.g. 'audio/ogg')
+ * @param language Internal language code (default 'mr' → mr-IN)
+ * @returns the transcript text ('' if Sarvam returns nothing)
+ */
+export async function speechToText(audio: Buffer, mimeType = 'audio/ogg', language = 'mr'): Promise<string> {
+  if (!SARVAM_API_KEY) throw new Error('SARVAM_API_KEY is not set');
+
+  const langCode = LANG_MAP[language] ?? 'mr-IN';
+  const ext = mimeType.includes('wav') ? 'wav' : mimeType.includes('mp3') || mimeType.includes('mpeg') ? 'mp3' : 'ogg';
+
+  const form = new FormData();
+  // Node 18+ provides global Blob/FormData/fetch.
+  form.append('file', new Blob([audio], { type: mimeType }), `voice.${ext}`);
+  form.append('model', 'saarika:v2');
+  form.append('language_code', langCode);
+
+  const res = await fetch('https://api.sarvam.ai/speech-to-text', {
+    method: 'POST',
+    headers: { 'api-subscription-key': SARVAM_API_KEY },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Sarvam STT error ${res.status}: ${body}`);
+  }
+
+  const data = (await res.json()) as { transcript?: string };
+  return (data.transcript ?? '').trim();
+}
+
 function splitText(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
   const chunks: string[] = [];

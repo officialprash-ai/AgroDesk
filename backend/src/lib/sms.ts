@@ -19,6 +19,9 @@ export const DLT_TEMPLATES = {
   recovery_gentle:      { id: process.env.DLT_TPL_RECOVERY_GENTLE  ?? '', text: 'Dear {#var#}, your EMI payment of Rs.{#var#} is due. Please pay at the earliest. - {#var#} Dealership' },
   recovery_firm:        { id: process.env.DLT_TPL_RECOVERY_FIRM    ?? '', text: 'Dear {#var#}, your overdue payment of Rs.{#var#} requires immediate attention. Contact us at {#var#}. - AgroDesk' },
   whatsapp_unavailable: { id: process.env.DLT_TPL_WA_UNAVAILABLE   ?? '', text: 'Dear {#var#}, we tried reaching you on WhatsApp. Please call {#var#} for your tractor enquiry. - AgroDesk' },
+  // Support Intake: last-resort alert to the mechanic/technician when the
+  // WhatsApp staff notification can't be delivered. Staff-facing, not consumer.
+  support_notify:       { id: process.env.DLT_TPL_SUPPORT_NOTIFY   ?? '', text: 'New {#var#} request from {#var#} ({#var#}). Details: {#var#}. - AgroDesk' },
 } as const;
 
 export type DLTTemplateKey = keyof typeof DLT_TEMPLATES;

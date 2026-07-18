@@ -12,6 +12,7 @@ import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatCurrency, formatRelative } from '../../lib/utils';
 import { useChartTheme } from '../../lib/useChartTheme';
+import { SupportTile } from '../../components/shared/SupportTile';
 import {
   Users, Megaphone, IndianRupee, Phone, Truck,
   ArrowRight, TrendingUp, Sparkles, CheckCircle, Activity,
@@ -196,6 +197,11 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </FadeUp>
+
+        {/* ── Support Intake tile ───────────────────────────────────────── */}
+        <FadeUp delay={0.03}>
+          <SupportTile />
         </FadeUp>
 
         {/* ── Metrics Grid ──────────────────────────────────────────────── */}

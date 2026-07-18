@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
   Zap, BarChart2, LogOut, HelpCircle,
-  TrendingUp, Tag, Clock, Mic, Sparkles, Calculator,
+  TrendingUp, Tag, Clock, Mic, Sparkles, Calculator, LifeBuoy, Wrench,
 } from 'lucide-react';
 import AgroDeskoLogo, { LogoMark } from '../ui/AgroDeskoLogo';
 
@@ -30,6 +30,7 @@ const NAV: Array<
   { to: '/cold-calling',   icon: Phone,       label: 'Cold Calling',   badgeIcon: Mic,         badgeColor: '#a78bfa' },
   { to: '/ai-salesman',    icon: Bot,         label: 'AI Salesman',    badgeIcon: Sparkles,    badgeColor: '#34d399' },
   { to: '/ai-accountant',  icon: FileText,    label: 'AI Accountant',  badgeIcon: Calculator,  badgeColor: '#fb923c' },
+  { to: '/support',        icon: LifeBuoy,    label: 'Support Intake', badgeIcon: Wrench,      badgeColor: '#f87171' },
   { section: 'SYSTEM' },
   { to: '/settings', icon: Settings,   label: 'Settings' },
   { to: '/help',     icon: HelpCircle, label: 'Help & Support' },

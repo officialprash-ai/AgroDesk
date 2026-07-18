@@ -2,6 +2,11 @@ import { Router } from 'express';
 import { prisma as _prisma } from '../lib/prisma.js';
 const prisma = _prisma as any;
 import { sendWhatsApp } from '../lib/whatsapp.js';
+import { handleIntake } from '../services/support/intake.js';
+import { enqueueSupportNotify } from '../services/support/notify.js';
+import { speechToText } from '../lib/sarvam.js';
+import { uploadToS3, isS3Configured } from '../lib/s3.js';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 import { geminiText } from '../lib/llm.js';
@@ -262,6 +267,144 @@ router.post('/sms', async (req, res) => {
   } catch (err) {
     console.error('[webhook/sms]', err);
     res.status(200).send('<Response/>');
+  }
+});
+
+// ── POST /api/webhooks/whatsapp-support ───────────────────────────────────────
+// Support Intake channel. Dealers point their SUPPORT WhatsApp number's inbound
+// webhook here (kept separate from /whatsapp, which runs the AI Salesman).
+//
+// Guarantee: the ticket is created (handleIntake) BEFORE we reply or notify. If
+// the reply/notify fails, the ticket still exists. Idempotent on MessageSid
+// (WhatsApp retries). Demo dealers: ticket is created, but NO real WhatsApp is
+// sent (neither the customer ack nor the staff notify).
+const SUPPORT_ACK_MR = 'नोंद झाली. आमचा माणूस फोन करेल.';
+
+/** Download a Twilio media resource (requires Basic auth with the account creds). */
+async function downloadTwilioMedia(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString('base64')}` },
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') ?? 'application/octet-stream';
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { buffer, contentType };
+  } catch (err) {
+    console.error('[webhook/whatsapp-support] media download failed:', (err as Error).message);
+    return null;
+  }
+}
+
+router.post('/whatsapp-support', async (req, res) => {
+  try {
+    const {
+      From, To, Body, MessageSid, NumMedia,
+    } = req.body as Record<string, string>;
+
+    // Map the receiving business number → dealer.
+    const dealerPhone = (To ?? '').replace('whatsapp:', '').replace(/\D/g, '').replace(/^91/, '');
+    const dealer = await prisma.dealer.findFirst({ where: { phone: { endsWith: dealerPhone } } });
+    if (!dealer) {
+      console.warn('[webhook/whatsapp-support] no dealer for', To);
+      return res.status(200).send('<Response/>');
+    }
+
+    const fromPhone = (From ?? '').replace('whatsapp:', '');
+    const isDemo = dealer.is_demo === true;
+
+    // Idempotency: if we've already logged this MessageSid, ack silently.
+    if (MessageSid) {
+      const seen = await prisma.supportRequest
+        .findUnique({ where: { external_call_id: MessageSid } })
+        .catch(() => null);
+      if (seen) return res.status(200).send('<Response/>');
+    }
+
+    // ── Resolve the message text + media ──────────────────────
+    let text = (Body ?? '').trim();
+    const mediaUrls: string[] = [];
+    const mediaCount = parseInt(NumMedia ?? '0', 10) || 0;
+
+    for (let i = 0; i < mediaCount; i++) {
+      const url = (req.body as Record<string, string>)[`MediaUrl${i}`];
+      const ctype = (req.body as Record<string, string>)[`MediaContentType${i}`] ?? '';
+      if (!url) continue;
+
+      if (ctype.startsWith('audio/')) {
+        // Voice note → Marathi transcript becomes the request text.
+        const media = await downloadTwilioMedia(url);
+        if (media) {
+          try {
+            const transcript = await speechToText(media.buffer, ctype, 'mr');
+            if (transcript) text = text ? `${text}\n${transcript}` : transcript;
+          } catch (err) {
+            console.error('[webhook/whatsapp-support] STT failed:', (err as Error).message);
+          }
+        }
+      } else if (ctype.startsWith('image/')) {
+        // Photo → store to S3 (ap-south-1) if configured, else keep the Twilio URL.
+        if (isS3Configured()) {
+          const media = await downloadTwilioMedia(url);
+          if (media) {
+            const ext = ctype.split('/')[1] || 'jpg';
+            const key = `support/${dealer.id}/${randomUUID()}.${ext}`;
+            try {
+              const s3url = await uploadToS3(media.buffer, key, ctype);
+              mediaUrls.push(s3url);
+            } catch (err) {
+              console.error('[webhook/whatsapp-support] S3 upload failed:', (err as Error).message);
+              mediaUrls.push(url);
+            }
+          }
+        } else {
+          mediaUrls.push(url);
+        }
+      } else {
+        mediaUrls.push(url);
+      }
+    }
+
+    if (!text && mediaUrls.length === 0) {
+      // Nothing to log.
+      return res.status(200).send('<Response/>');
+    }
+
+    // ── Ticket first, ALWAYS ──────────────────────────────────
+    const ticket = await handleIntake({
+      dealerId: dealer.id,
+      phone: fromPhone,
+      text: text || '(फक्त फोटो पाठवला)',
+      channel: 'WHATSAPP',
+      mediaUrls,
+      externalCallId: MessageSid,
+      isDemo,
+    });
+
+    // ── Reply to the customer (skip for demo) ─────────────────
+    res.setHeader('Content-Type', 'text/xml');
+    if (isDemo) {
+      res.status(200).send('<Response/>');
+    } else {
+      // Inline TwiML reply — no extra API round-trip, stays inside the window.
+      res.status(200).send(`<Response><Message>${SUPPORT_ACK_MR}</Message></Response>`);
+    }
+
+    // ── Notify staff AFTER the ticket exists (skip for demo) ───
+    if (!isDemo) {
+      enqueueSupportNotify(dealer.id, ticket.id).catch((err) =>
+        console.error('[webhook/whatsapp-support] notify enqueue error:', err),
+      );
+    }
+
+    console.log(`[webhook/whatsapp-support] ${ticket.type} ticket ${ticket.id} from ${fromPhone}${isDemo ? ' (demo — no sends)' : ''}`);
+    return;
+  } catch (err) {
+    console.error('[webhook/whatsapp-support]', err);
+    return res.status(200).send('<Response/>'); // always 200 to Twilio
   }
 });
 

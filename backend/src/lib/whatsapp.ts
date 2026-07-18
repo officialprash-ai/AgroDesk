@@ -71,3 +71,69 @@ export async function sendWhatsApp(to: string, body: string): Promise<WAResult> 
   const data = await res.json() as { sid: string; status: string };
   return { sid: data.sid, status: data.status };
 }
+
+/**
+ * Send a PRE-APPROVED WhatsApp template message (Twilio Content API).
+ *
+ * Why this exists: free-form WhatsApp only works inside the 24-hour customer
+ * service window — i.e. only if the recipient messaged the business number in
+ * the last 24h. Business-initiated messages (like alerting a mechanic that a
+ * new service request came in) will be REJECTED by Meta unless they use an
+ * approved template. `sendWhatsApp()` above is therefore unreliable for staff
+ * notifications; use this instead.
+ *
+ * Terminology note: WhatsApp templates are approved by **Meta**, via the
+ * Twilio Content Template Builder. India's **DLT** registration (TRAI) is a
+ * separate regime that applies to SMS and voice headers — see lib/sms.ts.
+ *
+ * @param to         Recipient phone (any Indian format)
+ * @param contentSid Approved template SID (starts with "HX...")
+ * @param variables  Positional values for the template's {{1}}, {{2}}, … slots
+ *
+ * Docs: https://www.twilio.com/docs/content/send-templates-with-the-content-api
+ */
+export async function sendWhatsAppTemplate(
+  to: string,
+  contentSid: string,
+  variables: string[] = [],
+): Promise<WAResult> {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !WA_FROM) {
+    throw new Error('Twilio/WhatsApp credentials not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / WHATSAPP_PHONE_ID)');
+  }
+  if (!contentSid) throw new Error('sendWhatsAppTemplate requires an approved ContentSid');
+
+  // Twilio expects ContentVariables as a JSON object keyed by 1-based position.
+  const contentVariables = variables.reduce<Record<string, string>>((acc, v, i) => {
+    acc[String(i + 1)] = v;
+    return acc;
+  }, {});
+
+  const params = new URLSearchParams({
+    From: WA_FROM,
+    To: normaliseWA(to),
+    ContentSid: contentSid,
+  });
+  if (variables.length) params.set('ContentVariables', JSON.stringify(contentVariables));
+
+  const credentials = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64');
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Twilio WhatsApp template error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json() as { sid: string; status: string };
+  return { sid: data.sid, status: data.status };
+}
