@@ -44,7 +44,7 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
   const navigate = useNavigate();
   const {
     notifications, removeNotification, toasts, dismissToast,
-    dealer, dealerLogo, setLanguage, theme, setTheme,
+    dealer, dealerLogo, setLanguage, uiLanguage, setUiLanguage, theme, setTheme,
     contacts, knowledgeBase, clearAuth,
   } = useAppStore();
 
@@ -63,7 +63,9 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
 
   // ── language ───────────────────────────────────────────────────────────────
   const [showLangMenu, setShowLangMenu] = useState(false);
-  const lang = dealer?.language ?? 'mr';
+  // The selector reflects the CONSOLE language (defaults to English), not the
+  // dealer's content language.
+  const lang = uiLanguage ?? 'en';
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
   const initials = dealer?.name
     ? dealer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -313,7 +315,10 @@ export const Header: React.FC<{ title: string; subtitle?: string }> = ({ title, 
                 className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-[var(--border)] shadow-[var(--shadow-lg)] overflow-hidden z-50 py-1 max-h-72 overflow-y-auto"
               >
                 {LANGUAGES.map(l => (
-                  <button key={l.code} onClick={() => { setLanguage(l.code); setShowLangMenu(false); }}
+                  // Switches the CONSOLE language. `setLanguage` additionally keeps the
+                  // dealer's content language (call scripts / WhatsApp / TTS) in sync —
+                  // see store/index.ts for why the two are modelled separately.
+                  <button key={l.code} onClick={() => { setUiLanguage(l.code); setLanguage(l.code); setShowLangMenu(false); }}
                     className={cn('w-full text-left px-3 py-2 text-xs hover:bg-[rgba(255,255,255,0.05)] transition-colors flex items-center justify-between',
                       l.code === lang ? 'text-brand-400' : 'text-[var(--text-secondary)]')}>
                     <span>{l.label}</span><span className="text-[10px] text-[var(--text-muted)]">{l.english}</span>

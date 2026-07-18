@@ -6,16 +6,17 @@ import { useAppStore } from '../../store';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/useApi';
 import { formatRelative } from '../../lib/utils';
+import { useT } from '../../lib/i18n';
 import {
   Phone, MessageCircle, Pencil, Wrench, FileText, Check, Plus, Settings as SettingsIcon, Inbox,
 } from 'lucide-react';
 
 // ─── Display metadata ─────────────────────────────────────────────────────────
-const TYPE_META: Record<string, { label: string; variant: 'active' | 'pending' | 'overdue' | 'info' | 'purple' }> = {
-  SERVICE: { label: 'सर्विस', variant: 'active' },
-  REPAIR: { label: 'दुरुस्ती', variant: 'overdue' },
-  OTHER: { label: 'इतर', variant: 'info' },
-  UNSURE: { label: 'अनिश्चित', variant: 'pending' },
+const TYPE_META: Record<string, { key: string; variant: 'active' | 'pending' | 'overdue' | 'info' | 'purple' }> = {
+  SERVICE: { key: 'support.type.SERVICE', variant: 'active' },
+  REPAIR: { key: 'support.type.REPAIR', variant: 'overdue' },
+  OTHER: { key: 'support.type.OTHER', variant: 'info' },
+  UNSURE: { key: 'support.type.UNSURE', variant: 'pending' },
 };
 
 const CHANNEL_ICON: Record<string, React.ReactNode> = {
@@ -25,9 +26,9 @@ const CHANNEL_ICON: Record<string, React.ReactNode> = {
 };
 
 const STATUS_CHIPS = [
-  { id: 'all', label: 'सर्व', status: undefined },
-  { id: 'new', label: 'नवीन', status: 'NEW' },
-  { id: 'progress', label: 'सुरू', status: 'IN_PROGRESS' },
+  { id: 'all', key: 'common.all', status: undefined },
+  { id: 'new', key: 'common.new', status: 'NEW' },
+  { id: 'progress', key: 'common.inProgress', status: 'IN_PROGRESS' },
 ] as const;
 
 // ─── Ticket row ───────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ const TicketRow: React.FC<{
   onCallBack: (r: any) => void;
   onDone: (r: any) => void;
 }> = ({ r, onCallBack, onDone }) => {
+  const t = useT();
   const who = r.contact?.name || r.caller_name || r.phone;
   const tractor = r.machine ? `${r.machine.make} ${r.machine.model}` : null;
   const type = TYPE_META[r.type] ?? TYPE_META.UNSURE;
@@ -49,7 +51,7 @@ const TicketRow: React.FC<{
       className="flex items-center gap-3 py-3 px-4 border-b border-[var(--border)] last:border-0 hover:bg-[rgba(255,255,255,0.02)]"
     >
       {notConnected && (
-        <span title="कॉल जोडला गेला नाही" className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
+        <span title={t('support.notConnected')} className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
       )}
       {!notConnected && <span className="w-2 h-2 flex-shrink-0" />}
 
@@ -57,8 +59,8 @@ const TicketRow: React.FC<{
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-[var(--text-primary)] truncate">{who}</span>
           {tractor && <span className="text-xs text-[var(--text-muted)]">· {tractor}</span>}
-          <Badge variant={type.variant} className="ml-0.5">{type.label}</Badge>
-          {r.status === 'DONE' && <Badge variant="active">पूर्ण</Badge>}
+          <Badge variant={type.variant} className="ml-0.5">{t(type.key)}</Badge>
+          {r.status === 'DONE' && <Badge variant="active">{t('common.done')}</Badge>}
         </div>
         <p className="text-sm text-[var(--text-secondary)] mt-0.5 truncate">{r.note}</p>
       </div>
@@ -71,10 +73,10 @@ const TicketRow: React.FC<{
       {r.status !== 'DONE' && (
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <Button size="sm" variant="secondary" icon={<Phone size={13} />} onClick={() => onCallBack(r)}>
-            परत कॉल
+            {t('support.callBack')}
           </Button>
           <Button size="sm" variant="ghost" icon={<Check size={13} />} onClick={() => onDone(r)}>
-            पूर्ण
+            {t('common.done')}
           </Button>
         </div>
       )}
@@ -89,9 +91,10 @@ const SupportPanel: React.FC<{
   onCallBack: (r: any) => void;
   onDone: (r: any) => void;
 }> = ({ rows, loading, onCallBack, onDone }) => {
-  if (loading) return <div className="py-16 text-center text-[var(--text-muted)]">लोड होत आहे…</div>;
+  const t = useT();
+  if (loading) return <div className="py-16 text-center text-[var(--text-muted)]">{t('common.loading')}</div>;
   if (rows.length === 0)
-    return <EmptyState icon={<Inbox size={28} />} title="विनंत्या नाहीत" message="इथे नवीन सेवा किंवा दुरुस्ती विनंत्या दिसतील." />;
+    return <EmptyState icon={<Inbox size={28} />} title={t('support.empty.title')} message={t('support.empty.message')} />;
   return (
     <div>
       {rows.map((r) => (
@@ -103,6 +106,7 @@ const SupportPanel: React.FC<{
 
 // ─── Routing settings ─────────────────────────────────────────────────────────
 const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error') => void }> = ({ showToast }) => {
+  const t = useT();
   const { data, loading } = useApi(() => api.support.routing(), []);
   const [form, setForm] = useState<any>(null);
   const [saving, setSaving] = useState(false);
@@ -119,7 +123,7 @@ const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error'
     }
   }, [data]);
 
-  if (loading || !form) return <div className="py-10 text-center text-[var(--text-muted)]">लोड होत आहे…</div>;
+  if (loading || !form) return <div className="py-10 text-center text-[var(--text-muted)]">{t('common.loading')}</div>;
 
   const field = (key: string, label: string, hint: string, type = 'tel') => (
     <div>
@@ -138,9 +142,9 @@ const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error'
     setSaving(true);
     try {
       await api.support.saveRouting(form);
-      showToast('राउटिंग जतन झाले');
+      showToast(t('support.routing.saved'));
     } catch {
-      showToast('जतन करता आले नाही', 'error');
+      showToast(t('common.saveFailed'), 'error');
     }
     setSaving(false);
   };
@@ -148,22 +152,23 @@ const RoutingSettings: React.FC<{ showToast: (m: string, t?: 'success' | 'error'
   return (
     <Card className="p-6 max-w-lg space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">
-        सेवा / दुरुस्ती विनंत्या मेकॅनिककडे जातात, इतर कामे टेक्निशियनकडे. कोणी नसेल तर डीलरकडे.
+        {t('support.routing.intro')}
       </p>
-      {field('mechanic_phone', 'मेकॅनिक फोन', 'सर्विस व दुरुस्तीसाठी')}
-      {field('technician_phone', 'टेक्निशियन फोन', 'RTO, विमा, कागदपत्रे, पार्ट्ससाठी')}
-      {field('dealer_phone', 'डीलर फोन', 'बॅकअप — इतर कोणी नसल्यास इथे जाईल')}
+      {field('mechanic_phone', t('support.routing.mechanic'), t('support.routing.mechanicHint'))}
+      {field('technician_phone', t('support.routing.technician'), t('support.routing.technicianHint'))}
+      {field('dealer_phone', t('support.routing.dealer'), t('support.routing.dealerHint'))}
       <div className="grid grid-cols-2 gap-3">
-        {field('office_hours_start', 'ऑफिस सुरू', 'IST, 24-तास', 'time')}
-        {field('office_hours_end', 'ऑफिस बंद', 'यानंतर कॉल जोडला जात नाही', 'time')}
+        {field('office_hours_start', t('support.routing.officeStart'), t('support.routing.officeHint'), 'time')}
+        {field('office_hours_end', t('support.routing.officeEnd'), t('support.routing.afterHoursHint'), 'time')}
       </div>
-      <Button onClick={save} loading={saving}>जतन करा</Button>
+      <Button onClick={save} loading={saving}>{t('common.save')}</Button>
     </Card>
   );
 };
 
 // ─── Manual add modal (minimal) ───────────────────────────────────────────────
 const AddModal: React.FC<{ open: boolean; onClose: () => void; onAdded: () => void; showToast: (m: string, t?: 'success' | 'error') => void }> = ({ open, onClose, onAdded, showToast }) => {
+  const t = useT();
   const [form, setForm] = useState({ phone: '', note: '', type: 'SERVICE', caller_name: '' });
   const [saving, setSaving] = useState(false);
   if (!open) return null;
@@ -173,12 +178,12 @@ const AddModal: React.FC<{ open: boolean; onClose: () => void; onAdded: () => vo
     setSaving(true);
     try {
       await api.support.create(form);
-      showToast('नोंद जोडली');
+      showToast(t('support.added'));
       setForm({ phone: '', note: '', type: 'SERVICE', caller_name: '' });
       onAdded();
       onClose();
     } catch {
-      showToast('नोंद जोडता आली नाही', 'error');
+      showToast(t('support.addFailed'), 'error');
     }
     setSaving(false);
   };
@@ -186,22 +191,22 @@ const AddModal: React.FC<{ open: boolean; onClose: () => void; onAdded: () => vo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <Card className="p-6 w-full max-w-md space-y-3" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        <h3 className="font-display font-semibold text-lg">नवीन नोंद</h3>
-        <input placeholder="फोन नंबर" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        <h3 className="font-display font-semibold text-lg">{t('support.addNew')}</h3>
+        <input placeholder={t('support.form.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
           className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-[var(--text-primary)]" />
-        <input placeholder="ग्राहकाचे नाव (ऐच्छिक)" value={form.caller_name} onChange={(e) => setForm({ ...form, caller_name: e.target.value })}
+        <input placeholder={t('support.form.name')} value={form.caller_name} onChange={(e) => setForm({ ...form, caller_name: e.target.value })}
           className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-[var(--text-primary)]" />
         <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}
           className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-[var(--text-primary)]">
-          <option value="SERVICE">सर्विस</option>
-          <option value="REPAIR">दुरुस्ती</option>
-          <option value="OTHER">इतर</option>
+          <option value="SERVICE">{t('support.type.SERVICE')}</option>
+          <option value="REPAIR">{t('support.type.REPAIR')}</option>
+          <option value="OTHER">{t('support.type.OTHER')}</option>
         </select>
-        <textarea placeholder="काय काम आहे?" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3}
+        <textarea placeholder={t('support.form.work')} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={3}
           className="w-full px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.04)] border border-[var(--border)] text-[var(--text-primary)]" />
         <div className="flex gap-2 justify-end">
-          <Button variant="ghost" onClick={onClose}>रद्द</Button>
-          <Button onClick={submit} loading={saving}>जतन</Button>
+          <Button variant="ghost" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button onClick={submit} loading={saving}>{t('common.save')}</Button>
         </div>
       </Card>
     </div>
@@ -210,6 +215,7 @@ const AddModal: React.FC<{ open: boolean; onClose: () => void; onAdded: () => vo
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export const Support: React.FC = () => {
+  const t = useT();
   const { dealer } = useAppStore();
   const [tab, setTab] = useState<'service' | 'other' | 'settings'>('service');
   const [chip, setChip] = useState<'all' | 'new' | 'progress'>('all');
@@ -237,28 +243,28 @@ export const Support: React.FC = () => {
   const onDone = async (r: any) => {
     try {
       await api.support.update(r.id, { status: 'DONE' });
-      showToast('पूर्ण म्हणून चिन्हांकित');
+      showToast(t('support.markedDone'));
       refetch();
     } catch {
-      showToast('अपडेट करता आले नाही', 'error');
+      showToast(t('common.updateFailed'), 'error');
     }
   };
 
   const tabs = [
-    { id: 'service', label: 'सेवा / दुरुस्ती', icon: <Wrench size={14} />, count: serviceRows.length },
-    { id: 'other', label: 'इतर', icon: <FileText size={14} />, count: otherRows.length },
-    { id: 'settings', label: 'सेटिंग्ज', icon: <SettingsIcon size={14} /> },
+    { id: 'service', label: t('support.tab.service'), icon: <Wrench size={14} />, count: serviceRows.length },
+    { id: 'other', label: t('support.tab.other'), icon: <FileText size={14} />, count: otherRows.length },
+    { id: 'settings', label: t('support.tab.settings'), icon: <SettingsIcon size={14} /> },
   ];
 
   return (
     <div>
-      <Header title="सपोर्ट विनंत्या" subtitle="प्रत्येक कॉल आणि WhatsApp विनंती इथे नोंदवली जाते" />
+      <Header title={t('support.title')} subtitle={t('support.subtitle')} />
 
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <TabBar tabs={tabs} active={tab} onChange={(t) => setTab(t as any)} />
           {tab !== 'settings' && (
-            <Button icon={<Plus size={15} />} onClick={() => setShowAdd(true)}>नवीन नोंद</Button>
+            <Button icon={<Plus size={15} />} onClick={() => setShowAdd(true)}>{t('support.addNew')}</Button>
           )}
         </div>
 
@@ -274,7 +280,7 @@ export const Support: React.FC = () => {
                     : 'bg-[rgba(255,255,255,0.04)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
-                {c.label}
+                {t(c.key)}
               </button>
             ))}
           </div>

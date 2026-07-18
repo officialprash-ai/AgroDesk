@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store';
+import { useT } from '../../lib/i18n';
 import {
   LayoutDashboard, Users, Megaphone, Truck, IndianRupee,
   Phone, Bot, FileText, Settings, ChevronLeft, ChevronRight,
@@ -13,30 +14,33 @@ import AgroDeskoLogo, { LogoMark } from '../ui/AgroDeskoLogo';
 
 type LucideIcon = React.ComponentType<{ size?: number; className?: string }>;
 
+// `label` / `section` hold i18n KEYS, resolved at render time via useT() so the
+// sidebar re-translates instantly when the header language selector changes.
 const NAV: Array<
   | { section: string }
   | { to: string; icon: LucideIcon; label: string; exact?: boolean; badgeIcon?: LucideIcon; badgeColor?: string }
 > = [
-  { section: 'OVERVIEW' },
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/analytics', icon: BarChart2, label: 'Analytics' },
-  { section: 'CRM' },
-  { to: '/crm/contacts', icon: Users,    label: 'Contacts' },
-  { to: '/crm/pipeline', icon: Zap,      label: 'Pipeline' },
-  { section: 'AGENTS' },
-  { to: '/sales-engine',   icon: Megaphone,  label: 'Sales Engine',   badgeIcon: TrendingUp,  badgeColor: '#4ade80' },
-  { to: '/used-tractor',   icon: Truck,       label: 'Used Tractor',   badgeIcon: Tag,         badgeColor: '#60a5fa' },
-  { to: '/money-recovery', icon: IndianRupee, label: 'Money Recovery', badgeIcon: Clock,       badgeColor: '#fbbf24' },
-  { to: '/cold-calling',   icon: Phone,       label: 'Cold Calling',   badgeIcon: Mic,         badgeColor: '#a78bfa' },
-  { to: '/ai-salesman',    icon: Bot,         label: 'AI Salesman',    badgeIcon: Sparkles,    badgeColor: '#34d399' },
-  { to: '/ai-accountant',  icon: FileText,    label: 'AI Accountant',  badgeIcon: Calculator,  badgeColor: '#fb923c' },
-  { to: '/support',        icon: LifeBuoy,    label: 'Support Intake', badgeIcon: Wrench,      badgeColor: '#f87171' },
-  { section: 'SYSTEM' },
-  { to: '/settings', icon: Settings,   label: 'Settings' },
-  { to: '/help',     icon: HelpCircle, label: 'Help & Support' },
+  { section: 'nav.overview' },
+  { to: '/', icon: LayoutDashboard, label: 'nav.dashboard', exact: true },
+  { to: '/analytics', icon: BarChart2, label: 'nav.analytics' },
+  { section: 'nav.crm' },
+  { to: '/crm/contacts', icon: Users,    label: 'nav.contacts' },
+  { to: '/crm/pipeline', icon: Zap,      label: 'nav.pipeline' },
+  { section: 'nav.agents' },
+  { to: '/sales-engine',   icon: Megaphone,  label: 'nav.salesEngine',   badgeIcon: TrendingUp,  badgeColor: '#4ade80' },
+  { to: '/used-tractor',   icon: Truck,       label: 'nav.usedTractor',   badgeIcon: Tag,         badgeColor: '#60a5fa' },
+  { to: '/money-recovery', icon: IndianRupee, label: 'nav.moneyRecovery', badgeIcon: Clock,       badgeColor: '#fbbf24' },
+  { to: '/cold-calling',   icon: Phone,       label: 'nav.coldCalling',   badgeIcon: Mic,         badgeColor: '#a78bfa' },
+  { to: '/ai-salesman',    icon: Bot,         label: 'nav.aiSalesman',    badgeIcon: Sparkles,    badgeColor: '#34d399' },
+  { to: '/ai-accountant',  icon: FileText,    label: 'nav.aiAccountant',  badgeIcon: Calculator,  badgeColor: '#fb923c' },
+  { to: '/support',        icon: LifeBuoy,    label: 'nav.supportIntake', badgeIcon: Wrench,      badgeColor: '#f87171' },
+  { section: 'nav.system' },
+  { to: '/settings', icon: Settings,   label: 'nav.settings' },
+  { to: '/help',     icon: HelpCircle, label: 'nav.help' },
 ];
 
 export const Sidebar: React.FC = () => {
+  const t = useT();
   const { sidebarOpen, toggleSidebar, dealer, clearAuth, dealerLogo, theme } = useAppStore();
   const isDark = theme !== 'light';
   const location = useLocation();
@@ -123,7 +127,7 @@ export const Sidebar: React.FC = () => {
                 animate={{ opacity: 1 }}
                 className="text-[9px] font-bold tracking-[0.14em] text-[var(--text-muted)] px-3 pt-4 pb-1.5 uppercase whitespace-nowrap"
               >
-                {item.section}
+                {t(item.section)}
               </motion.p>
             ) : (
               <div key={i} className="my-2 h-px bg-[var(--border)] mx-2" />
@@ -141,8 +145,8 @@ export const Sidebar: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
-              aria-label={item.label}
-              title={!sidebarOpen ? item.label : undefined}
+              aria-label={t(item.label)}
+              title={!sidebarOpen ? t(item.label) : undefined}
               className={cn(
                 'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 border group',
                 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
@@ -173,7 +177,7 @@ export const Sidebar: React.FC = () => {
                     transition={{ duration: 0.12 }}
                     className="flex-1 truncate text-sm relative z-10 whitespace-nowrap"
                   >
-                    {item.label}
+                    {t(item.label)}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -189,7 +193,7 @@ export const Sidebar: React.FC = () => {
                     border: `1px solid ${badgeColor}32`,
                     color: badgeColor,
                   }}
-                  title={item.label}
+                  title={t(item.label)}
                 >
                   <BadgeIcon size={10} />
                 </motion.span>
@@ -248,7 +252,7 @@ export const Sidebar: React.FC = () => {
             !sidebarOpen && 'justify-center',
           )}
         >
-          {sidebarOpen ? <><ChevronLeft size={14} /><span>Collapse</span></> : <ChevronRight size={14} />}
+          {sidebarOpen ? <><ChevronLeft size={14} /><span>{t('nav.collapse')}</span></> : <ChevronRight size={14} />}
         </motion.button>
         <motion.button
           whileHover={{ x: 1 }}
@@ -260,7 +264,7 @@ export const Sidebar: React.FC = () => {
           )}
         >
           <LogOut size={14} />
-          {sidebarOpen && <span>Sign Out</span>}
+          {sidebarOpen && <span>{t('nav.signOut')}</span>}
         </motion.button>
       </div>
     </motion.aside>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { LifeBuoy, PhoneOff, ArrowRight } from 'lucide-react';
 import { useSupportStore } from '../../store/support';
+import { useT } from '../../lib/i18n';
 
 /**
  * Dashboard tile for Support Intake. One big number: how many NEW requests are
@@ -11,12 +12,13 @@ import { useSupportStore } from '../../store/support';
  * seconds from across a workshop floor. Clicks through to the Support panel.
  */
 export const SupportTile: React.FC = () => {
+  const t = useT();
   const { summary, fetchSummary } = useSupportStore();
 
   useEffect(() => {
     fetchSummary();
-    const t = setInterval(fetchSummary, 30_000); // poll every 30s
-    return () => clearInterval(t);
+    const pollId = setInterval(fetchSummary, 30_000); // poll every 30s
+    return () => clearInterval(pollId);
   }, [fetchSummary]);
 
   const oldestAgeMs = summary.oldestNewAt ? Date.now() - new Date(summary.oldestNewAt).getTime() : 0;
@@ -41,12 +43,12 @@ export const SupportTile: React.FC = () => {
             <span className="text-3xl font-display font-bold tabular-nums text-[var(--text-primary)]">
               {summary.newCount}
             </span>
-            <span className="text-sm text-[var(--text-secondary)]">नवीन विनंत्या</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('support.newRequests')}</span>
           </div>
           {summary.untransferredCount > 0 && (
             <div className="flex items-center gap-1.5 mt-1 text-sm font-medium text-red-400">
               <PhoneOff size={13} />
-              {summary.untransferredCount} कॉल जोडला गेला नाही
+              {summary.untransferredCount} {t('support.callsNotConnected')}
             </div>
           )}
         </div>

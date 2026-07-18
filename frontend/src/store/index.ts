@@ -103,6 +103,16 @@ interface AppStore {
   theme: 'dark' | 'light' | 'night';
   setTheme: (theme: 'dark' | 'light' | 'night') => void;
 
+  /**
+   * UI language — what the DEALER sees in the console. Defaults to English
+   * because AgroDesk sells across India. Distinct from `dealer.language`,
+   * which is the CONTENT language used for call scripts, WhatsApp and TTS
+   * sent to farmers. A Pune dealer may want an English console while still
+   * calling farmers in Marathi.
+   */
+  uiLanguage: string;
+  setUiLanguage: (uiLanguage: string) => void;
+
   // Dealership logo
   dealerLogo: string | null;
   setDealerLogo: (logo: string | null) => void;
@@ -152,6 +162,9 @@ export const useAppStore = create<AppStore>()(
       closeScriptModal: () => set({ scriptModal: { open: false, type: '' } }),
       theme: 'dark',
       setTheme: (theme) => set({ theme }),
+
+      uiLanguage: 'en',
+      setUiLanguage: (uiLanguage) => set({ uiLanguage }),
       dealerLogo: null,
       setDealerLogo: (logo) => set({ dealerLogo: logo }),
       knowledgeBase: DEFAULT_KB,
@@ -185,7 +198,7 @@ export const useAppStore = create<AppStore>()(
     }),
     {
        name: 'agrodesk-auth',
-      partialize: (s) => ({ token: s.token, dealer: s.dealer, dealerLogo: s.dealerLogo, theme: s.theme, knowledgeBase: s.knowledgeBase }),
+      partialize: (s) => ({ token: s.token, dealer: s.dealer, dealerLogo: s.dealerLogo, theme: s.theme, uiLanguage: s.uiLanguage, knowledgeBase: s.knowledgeBase }),
     }
   )
 );
