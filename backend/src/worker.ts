@@ -25,7 +25,8 @@ if (process.env.SENTRY_DSN) {
 import { Job } from 'bull';
 import { randomUUID } from 'crypto';
 
-import { agentQueue, QueueJobData } from './lib/queue.js';
+import { agentQueue, deferJob, QueueJobData } from './lib/queue.js';
+import { isQuietHours, msUntilAllowedWindow, QUIET_HOURS_GATED_TYPES } from './lib/quietHours.js';
 import { prisma as _prisma } from './lib/prisma.js';
 const prisma = _prisma as any;
 
@@ -33,7 +34,7 @@ import { textToSpeech } from './lib/sarvam.js';
 import { placeCall, buildExoML } from './lib/exotel.js';
 import { getTelephonyProvider, TELEPHONY_PROVIDER } from './telephony/index.js';
 import { geminiText } from './lib/llm.js';
-import { sendWhatsApp } from './lib/whatsapp.js';
+import { sendWhatsApp, sendWhatsAppTemplate } from './lib/whatsapp.js';
 import { sendSMS, DLTTemplateKey } from './lib/sms.js';
 import { storeAudio } from './lib/audioStore.js';
 
@@ -70,32 +71,17 @@ async function logConsent(
 // ─── Compliance helpers ──────────────────────────────────────
 
 /**
- * Returns true if the current IST time is within TRAI quiet hours
- * (before 9 AM or after 9 PM IST). Calls/messages must NOT be sent then.
+ * TRAI quiet-hours handling now lives in lib/quietHours.ts and is applied at
+ * ENQUEUE time (see lib/queue.ts). The worker only re-checks as a safety net
+ * for jobs that were queued before this fix, or that sat in Redis across the
+ * 9 PM boundary.
+ *
+ * The old approach slept up to 30 minutes and then threw so Bull would retry.
+ * That could never work: Bull is configured for 3 attempts with 1m/2m/4m
+ * backoff (~7 minutes of coverage) against a 12-hour quiet window, so every
+ * evening-queued call was silently discarded after exhausting its attempts —
+ * while each sleeping job also occupied one of the 5 concurrency slots.
  */
-function isQuietHours(): boolean {
-  const nowUTC = Date.now();
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const istHour = new Date(nowUTC + IST_OFFSET_MS).getUTCHours();
-  return istHour < 9 || istHour >= 21;
-}
-
-/** Delay until 9:05 AM IST if currently in quiet hours */
-async function waitForAllowedWindow(): Promise<void> {
-  if (!isQuietHours()) return;
-  const nowUTC = Date.now();
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const istNow = new Date(nowUTC + IST_OFFSET_MS);
-  const nextAllowed = new Date(istNow);
-  nextAllowed.setUTCHours(3, 35, 0, 0); // 9:05 AM IST = 03:35 UTC
-  if (nextAllowed.getTime() <= nowUTC + IST_OFFSET_MS) {
-    nextAllowed.setUTCDate(nextAllowed.getUTCDate() + 1);
-  }
-  const waitMs = nextAllowed.getTime() - IST_OFFSET_MS - nowUTC;
-  console.log(`[worker] Quiet hours — waiting ${Math.round(waitMs / 60000)}m until 9:05 AM IST`);
-  await new Promise(r => setTimeout(r, Math.min(waitMs, 30 * 60 * 1000))); // check again in 30m max
-  if (isQuietHours()) throw new Error('Still in quiet hours — job will be retried by Bull');
-}
 
 // ─── Public base URL (for ExoML + audio endpoints) ──────────
 const BASE_URL = (process.env.BACKEND_URL ?? 'https://agrodesk-production.up.railway.app').replace(/\/$/, '');
@@ -228,7 +214,6 @@ async function buildStreamingGreeting(
  *   { case_id, script, escalation_stage }
  */
 async function handleVoiceCall(data: QueueJobData) {
-  await waitForAllowedWindow();
 
   const suppliedScript = data.payload.script as string | undefined;
   const contactId = (data.payload.contact_id as string) ?? '';
@@ -352,7 +337,6 @@ async function handleVoiceCall(data: QueueJobData) {
  *   { case_id, message }
  */
 async function handleWhatsApp(data: QueueJobData) {
-  await waitForAllowedWindow();
 
   let phone: string;
   let contactId: string | null = null;
@@ -501,7 +485,6 @@ async function handleMoneyRecovery(data: QueueJobData) {
  *   { contact_id, template_key, variables: string[], campaign_id? }
  */
 async function handleSMS(data: QueueJobData) {
-  await waitForAllowedWindow();
 
   const contactId   = data.payload.contact_id as string;
   const templateKey = (data.payload.template_key as DLTTemplateKey) ?? 'cold_call_followup';
@@ -588,9 +571,109 @@ async function handleSendToAccountant(data: QueueJobData) {
   }
 }
 
+/**
+ * Support Intake — notify the routed staff member (mechanic / technician /
+ * dealer) that a new service/repair/enquiry ticket has come in. Sends a short
+ * WhatsApp with a deep link to the ticket.
+ *
+ * This is an internal B2B staff notification (not a TRAI-regulated consumer
+ * message), so no opt-in / quiet-hours gate applies — same reasoning as
+ * handleSendToAccountant.
+ *
+ * Expected payload: { request_id }
+ */
+const SUPPORT_TYPE_MR: Record<string, string> = {
+  SERVICE: 'सर्विस', REPAIR: 'दुरुस्ती', OTHER: 'इतर काम', UNSURE: 'अनिश्चित',
+};
+
+async function handleSupportNotify(data: QueueJobData) {
+  const requestId = data.payload.request_id as string;
+  if (!requestId) throw new Error('support_notify job requires request_id in payload');
+
+  const ticket = await prisma.supportRequest.findUnique({
+    where: { id: requestId },
+    include: { contact: true },
+  });
+  if (!ticket) throw new Error(`SupportRequest ${requestId} not found`);
+
+  // No routing target on file → nothing to send; the ticket already surfaces on
+  // the dashboard, so this is a successful no-op.
+  if (!ticket.routed_to_phone) {
+    console.log(`[worker] support_notify ${requestId}: no routed_to_phone, skipping send`);
+    return;
+  }
+
+  const who = ticket.contact?.name || ticket.caller_name || ticket.phone;
+  const typeLabel = SUPPORT_TYPE_MR[ticket.type] ?? ticket.type;
+  const base = (process.env.FRONTEND_URL ?? 'https://frontend-sepia-five-70.vercel.app').replace(/\/$/, '');
+  const link = `${base}/support?ticket=${ticket.id}`;
+
+  const message =
+    `🔧 नवीन विनंती (${typeLabel})\n` +
+    `ग्राहक: ${who}\n` +
+    `फोन: ${ticket.phone}\n` +
+    `तपशील: ${ticket.note}\n\n` +
+    `पहा: ${link}`;
+
+  console.log(`[worker] Notifying support staff ${ticket.routed_to} (${ticket.routed_to_phone}) — ticket ${ticket.id}`);
+
+  // Delivery chain, most-reliable first. A staff alert is business-initiated,
+  // so free-form WhatsApp only works if that staff member happened to message
+  // the business number in the last 24h — never assume it.
+  //   1. Approved WhatsApp template (works any time)  ← configure this
+  //   2. Free-form WhatsApp (only inside the 24h window; fine for dev/sandbox)
+  //   3. DLT SMS (last resort, so a breakdown is never silently dropped)
+  const templateSid = process.env.WHATSAPP_TPL_SUPPORT_NOTIFY;
+  const noteShort = String(ticket.note).slice(0, 120);
+
+  if (templateSid) {
+    const { sid } = await sendWhatsAppTemplate(ticket.routed_to_phone, templateSid, [
+      typeLabel, who, ticket.phone, noteShort, link,
+    ]);
+    console.log(`[worker] Support staff notified via WhatsApp template — SID: ${sid}`);
+    return;
+  }
+
+  console.warn(
+    '[worker] WHATSAPP_TPL_SUPPORT_NOTIFY is not set — falling back to free-form WhatsApp, ' +
+    'which Meta rejects outside the 24-hour service window. Register a template before go-live.',
+  );
+
+  try {
+    const { sid } = await sendWhatsApp(ticket.routed_to_phone, message);
+    console.log(`[worker] Support staff notified via free-form WhatsApp — SID: ${sid}`);
+  } catch (waErr) {
+    console.error(`[worker] WhatsApp staff notify failed: ${(waErr as Error).message} — trying SMS`);
+    const { request_id } = await sendSMS(ticket.routed_to_phone, 'support_notify', [
+      typeLabel, who, ticket.phone, noteShort,
+    ]);
+    console.log(`[worker] Support staff notified via SMS — MSG91: ${request_id}`);
+  }
+}
+
 agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
   const { db_job_id, agent_type } = job.data;
   console.log(`[worker] Processing job ${db_job_id} (type: ${agent_type})`);
+
+  // ─── TRAI quiet-hours safety net ───────────────────────────
+  // Consumer-facing outbound is normally deferred at enqueue time. If a job
+  // still lands here inside the window (queued before this fix, or it crossed
+  // the 9 PM boundary while waiting), re-queue it as a DELAYED job and return.
+  // It leaves the queue immediately — no sleeping, no burned attempts, no
+  // concurrency slot held hostage.
+  if (QUIET_HOURS_GATED_TYPES.has(agent_type) && isQuietHours()) {
+    const delayMs = msUntilAllowedWindow();
+    console.log(
+      `[worker] ${agent_type} job ${db_job_id} is in TRAI quiet hours — ` +
+      `deferring ${Math.round(delayMs / 60_000)}m until 9:05 AM IST`,
+    );
+    await deferJob(job.data, delayMs);
+    await prisma.agentJob.update({
+      where: { id: db_job_id },
+      data: { status: 'pending', scheduled_for: new Date(Date.now() + delayMs) },
+    }).catch(() => {});
+    return; // this Bull job completes; the delayed clone runs in the morning
+  }
 
   // Mark in-progress
   await prisma.agentJob.update({
@@ -605,6 +688,7 @@ agentQueue.process(5 /* concurrency */, async (job: Job<QueueJobData>) => {
       case 'sms':               await handleSMS(job.data);               break;
       case 'money_recovery':    await handleMoneyRecovery(job.data);     break;
       case 'send_to_accountant': await handleSendToAccountant(job.data); break;
+      case 'support_notify':    await handleSupportNotify(job.data);     break;
       default:
         throw new Error(`Unknown agent_type: ${agent_type}`);
     }
