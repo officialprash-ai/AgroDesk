@@ -105,7 +105,17 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
       { language: sttLang },
       {
         onTranscript: (text) => void this.onUserUtterance(text),
-        onSpeechStart: () => this.onBargeInDetected(),
+        onSpeechStart: () => {
+          this.log.info('[voice-engine] caller speech started');
+          this.onBargeInDetected();
+        },
+        // CRITICAL: when the caller stops talking Sarvam holds the utterance open
+        // until it is flushed. Without this the transcript never arrives, so the
+        // agent finishes its opener and then stays silent forever.
+        onSpeechEnd: () => {
+          this.log.info('[voice-engine] caller speech ended — flushing for transcript');
+          this.stt.flush();
+        },
         onError: (err) => this.log.error('[voice-engine] stt', err),
       },
     );
@@ -119,9 +129,19 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
   }
 
   async start(_format: AudioFormat): Promise<void> {
-    // 1. Greet FIRST so the caller always hears the agent on pickup — even before
-    //    STT is up and even if STT is unavailable. Falls back to a default line
-    //    when no greeting arrived via call metadata.
+    // 0. Bring STT up IN PARALLEL with the greeting. It used to start only after
+    //    the opener finished, so anything the caller said during or right after
+    //    the greeting was dropped and the agent appeared deaf. Best-effort: a
+    //    Sarvam failure must not drop the call, so it is logged, never thrown.
+    const sttReady = this.stt
+      .start()
+      .then(() => this.log.info('[voice-engine] STT connected'))
+      .catch((err) =>
+        this.log.error('[voice-engine] STT unavailable — continuing without live transcription', err),
+      );
+
+    // 1. Greet so the caller always hears the agent on pickup. Falls back to a
+    //    default line when no greeting arrived via call metadata.
     const fullGreeting = this.greeting.trim() || defaultGreeting(this.shortLang);
     // Speak only a SHORT opener (first 1-2 sentences) so the call starts as a
     // conversation, not a monologue. The rest of the script is context the brain
@@ -144,13 +164,10 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
       if (myTurn === this.turnToken) this.speaking = false;
     }
 
-    // 2. STT is best-effort. A Sarvam error (e.g. 403) must NOT crash the process
-    //    or drop the call — log it and keep the line open with the greeting.
-    try {
-      await this.stt.start();
-    } catch (err) {
-      this.log.error('[voice-engine] STT unavailable — continuing without live transcription', err);
-    }
+    // 2. Opener done — make sure the STT handshake settled before we sit waiting
+    //    on the caller. Already non-fatal via the .catch() above.
+    await sttReady;
+    this.log.info('[voice-engine] listening for caller');
   }
 
   handleCallerAudio(chunk: PcmChunk): void {
