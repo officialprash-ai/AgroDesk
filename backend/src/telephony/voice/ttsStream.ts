@@ -35,7 +35,9 @@ const SARVAM_TTS_WSS = 'wss://api.sarvam.ai/text-to-speech/ws';
 const FRAME_BYTES = 320;
 
 /** Give up on a silent socket rather than hanging a turn forever. */
-const FIRST_AUDIO_TIMEOUT_MS = 8000;
+// Deliberately short: on a live call this window is pure silence, and expiring
+// it is what triggers the REST fallback. Better to give up fast and speak.
+const FIRST_AUDIO_TIMEOUT_MS = 4000;
 const IDLE_TIMEOUT_MS = 3000;
 
 const LANG_MAP: Record<string, string> = {
@@ -90,6 +92,7 @@ export class SarvamTtsStream {
     const queue: Buffer[] = [];
     let done = false;
     let failure: Error | null = null;
+    let lastServerMessage = '';
     let wake: (() => void) | null = null;
     const signal = () => {
       const w = wake;
@@ -127,10 +130,14 @@ export class SarvamTtsStream {
 
     ws.on('message', (raw: RawData) => {
       try {
-        const msg = JSON.parse(raw.toString()) as {
+        const text = raw.toString();
+        const msg = JSON.parse(text) as {
           type?: string;
           data?: Record<string, unknown>;
         };
+        // Keep the last non-audio frame so a silent stream can explain itself
+        // (rejected config, bad speaker for the model, quota, etc).
+        if (msg.type !== 'audio') lastServerMessage = text.slice(0, 400);
         if (msg.type === 'audio') {
           const b64 = String(msg.data?.audio ?? '');
           if (b64) queue.push(Buffer.from(b64, 'base64'));
@@ -153,7 +160,11 @@ export class SarvamTtsStream {
       done = true;
       signal();
     });
-    ws.on('close', () => {
+    ws.on('close', (code: number, reason: Buffer) => {
+      // 4xxx codes carry the real reason (auth, quota, bad config).
+      if (code !== 1000) {
+        lastServerMessage = `close ${code} ${reason?.toString?.() ?? ''}`.trim();
+      }
       done = true;
       signal();
     });
@@ -192,6 +203,15 @@ export class SarvamTtsStream {
       }
 
       if (failure) throw failure;
+      // Producing NOTHING must be an error, not a quiet empty result: the engine
+      // only falls back to REST TTS when this throws. Returning silently here is
+      // what turned a TTS problem into a completely silent call.
+      if (!sawAudio) {
+        throw new Error(
+          `[sarvam-tts] no audio received (model=${this.model} speaker=${this.speaker} ` +
+            `lang=${langCode}); last server message: ${lastServerMessage || '<none>'}`,
+        );
+      }
       // Flush a trailing partial frame so the last syllable isn't clipped.
       if (carry.length) yield carry;
     } finally {
