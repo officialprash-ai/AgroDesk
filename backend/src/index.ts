@@ -64,6 +64,12 @@ if (process.env.NODE_ENV === 'production') {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Railway terminates TLS at its edge and forwards X-Forwarded-For. Trust exactly
+// one hop so express-rate-limit keys on the real client IP instead of throwing
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every request. Do NOT raise this number:
+// trusting more hops than actually exist lets clients spoof their IP.
+app.set('trust proxy', 1);
+
 // ─── MIDDLEWARE ──────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {

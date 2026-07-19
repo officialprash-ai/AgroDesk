@@ -95,8 +95,19 @@ export class SarvamSttSession {
       this.audioBuf = this.audioBuf.subarray(SarvamSttSession.FRAME_BYTES);
       // Sarvam requires encoding + sample_rate inside every audio message
       // (SarvamAppRequest validation), not just on the connection URL.
+      //
+      // `encoding` is a strict enum whose ONLY accepted value is 'audio/wav' —
+      // sending 'pcm_s16le' here is rejected with:
+      //   audio.encoding: Input should be 'audio/wav'
+      // It does NOT mean we must wrap frames in a WAV container: the real codec
+      // is declared once on the connection URL via input_audio_codec=pcm_s16le,
+      // so the payload stays raw L16 and this field is just the required tag.
       const frame = JSON.stringify({
-        audio: { data: Buffer.from(frameBuf).toString('base64'), encoding: 'pcm_s16le', sample_rate: 8000 },
+        audio: {
+          data: Buffer.from(frameBuf).toString('base64'),
+          encoding: 'audio/wav',
+          sample_rate: 8000,
+        },
       });
       if (this.ready && this.ws) this.ws.send(frame);
       else this.queue.push(frame);
