@@ -38,6 +38,25 @@ export interface BridgeDeps {
   logger?: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void };
 }
 
+/**
+ * Live calls, keyed by the per-call token from the Stream URL.
+ *
+ * Plivo can drop and re-establish the media WebSocket mid-call. Treating that
+ * reconnect as a brand-new call built a second engine, which re-greeted the
+ * caller and threw away the STT session and conversation history — the "glitch,
+ * then it greets me again" behaviour. Instead we park the engine for a short
+ * grace period and re-attach it if the socket comes back.
+ */
+interface LiveCall {
+  engine: VoiceEngine;
+  /** Pending teardown, cancelled if the caller reconnects in time. */
+  dispose?: NodeJS.Timeout;
+}
+const liveCalls = new Map<string, LiveCall>();
+
+/** How long to hold an engine after the socket drops, waiting for a reconnect. */
+const RECONNECT_GRACE_MS = 10_000;
+
 /** Parse the query string off a WS upgrade request URL into a flat string map. */
 function parseUrlQuery(url?: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -146,15 +165,35 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
       rawWs as unknown as TelephonyWebSocket,
     );
     let engine: VoiceEngine | null = null;
+    /** Registry key for this socket, set once call.started resolves it. */
+    let callKey: string | undefined = urlMeta.token || undefined;
 
     session.on((event) => {
       switch (event.type) {
         case 'call.started': {
           const metadata = { ...urlMeta, ...stored, ...event.metadata } as Record<string, string>;
+          // Token is stable across reconnects for one call; callId is not.
+          const key = urlMeta.token || event.callId;
+          callKey = key;
+          const existing = liveCalls.get(key);
+
+          if (existing) {
+            // Reconnect: keep the same engine, so the caller is NOT greeted a
+            // second time and the conversation history and STT session survive.
+            clearTimeout(existing.dispose);
+            existing.dispose = undefined;
+            engine = existing.engine;
+            engine.onReplyAudio((pcm) => session.sendAudioChunk(pcm));
+            engine.onBargeIn(() => session.clearAudio());
+            log.info('[telephony] call.reconnected', event.callId, `key=${key}`);
+            break;
+          }
+
           log.info('[telephony] call.started', event.callId, metadata);
           engine = createEngine({ callId: event.callId, metadata });
           engine.onReplyAudio((pcm) => session.sendAudioChunk(pcm));
           engine.onBargeIn(() => session.clearAudio());
+          liveCalls.set(key, { engine });
           // Never let an engine start-up rejection become an unhandled rejection
           // (Node would crash the whole process, killing every call + the API).
           Promise.resolve(engine.start(event.format)).catch((err) =>
@@ -168,11 +207,29 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
         case 'dtmf':
           log.info('[telephony] dtmf', event.digit);
           break;
-        case 'call.stopped':
+        case 'call.stopped': {
           log.info('[telephony] call.stopped', event.callId, event.reason);
-          void engine?.stop();
+          const key = callKey ?? urlMeta.token ?? event.callId;
+          const live = key ? liveCalls.get(key) : undefined;
+          if (live) {
+            // Don't tear down yet — this may be a blip, not a hangup. If nobody
+            // reconnects within the grace window, release everything.
+            clearTimeout(live.dispose);
+            live.dispose = setTimeout(() => {
+              liveCalls.delete(key);
+              void Promise.resolve(live.engine.stop()).catch((err) =>
+                log.error('[telephony] engine stop failed', err),
+              );
+              log.info('[telephony] call released', key);
+            }, RECONNECT_GRACE_MS);
+            // Timer must not hold the process open on shutdown.
+            live.dispose.unref?.();
+          } else {
+            void engine?.stop();
+          }
           engine = null;
           break;
+        }
         case 'error':
           log.error('[telephony] stream error', event.error);
           break;

@@ -11,6 +11,7 @@ import type { AudioFormat, PcmChunk } from '../types.js';
 import type { VoiceEngine } from '../bridge.js';
 import { SarvamSttSession } from './stt.js';
 import { SarvamTtsFramer } from './tts.js';
+import { SarvamTtsStream } from './ttsStream.js';
 import { GeminiVoiceResponder, buildVoiceSystemPrompt, type Responder } from './responder.js';
 
 const LANG_NAMES: Record<string, string> = {
@@ -69,9 +70,18 @@ function defaultGreeting(shortLang: string): string {
   return greetings[lang] ?? greetings.mr;
 }
 
+/**
+ * Streaming TTS (WebSocket) is the low-latency path and the default. Set
+ * VOICE_TTS_MODE=rest to fall back to the blocking REST framer.
+ */
+const TTS_MODE = (process.env.VOICE_TTS_MODE ?? 'streaming').toLowerCase();
+
 export class AgroDeskVoiceEngine implements VoiceEngine {
   private readonly stt: SarvamSttSession;
-  private readonly tts: SarvamTtsFramer;
+  private readonly tts: { stream(text: string): AsyncIterable<PcmChunk> };
+  /** Blocking REST synthesizer, used if the streaming socket fails mid-call. */
+  private readonly ttsFallback: SarvamTtsFramer;
+  private ttsStreamBroken = false;
   private readonly responder: Responder;
   private readonly log: NonNullable<EngineOptions['logger']>;
   private readonly greeting: string;
@@ -88,7 +98,9 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
     this.shortLang = shortLang;
     this.log = opts.logger ?? console;
     this.greeting = opts.greeting ?? '';
-    this.tts = new SarvamTtsFramer(shortLang);
+    this.ttsFallback = new SarvamTtsFramer(shortLang);
+    this.tts =
+      TTS_MODE === 'rest' ? this.ttsFallback : new SarvamTtsStream(shortLang);
     // Build a personalized, conversational brain from the call metadata so the
     // agent reacts to the caller instead of reciting. The opener/script is passed
     // as the call goal so replies stay on-message but natural.
@@ -228,11 +240,36 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
   private async speak(sentence: string, myTurn: number): Promise<boolean> {
     const clean = sanitizeForSpeech(sentence);
     if (!clean) return true; // nothing speakable (e.g. was only a [direction])
-    for await (const pcm of this.tts.stream(clean)) {
-      if (myTurn !== this.turnToken) return false;
-      this.replyAudioCb(pcm);
+
+    const synth = this.ttsStreamBroken ? this.ttsFallback : this.tts;
+    let emitted = false;
+    try {
+      for await (const pcm of synth.stream(clean)) {
+        if (myTurn !== this.turnToken) return false; // barge-in: abandon iterator
+        emitted = true;
+        this.replyAudioCb(pcm);
+      }
+      return true;
+    } catch (err) {
+      this.log.error('[voice-engine] tts failed', err);
+      // If the streaming socket broke before producing any audio, retry this
+      // sentence on REST and stay there for the rest of the call — a silent
+      // agent is far worse than a slightly slower one.
+      if (!emitted && synth !== this.ttsFallback) {
+        this.ttsStreamBroken = true;
+        this.log.error('[voice-engine] falling back to REST TTS for this call');
+        try {
+          for await (const pcm of this.ttsFallback.stream(clean)) {
+            if (myTurn !== this.turnToken) return false;
+            this.replyAudioCb(pcm);
+          }
+          return true;
+        } catch (err2) {
+          this.log.error('[voice-engine] REST TTS fallback also failed', err2);
+        }
+      }
+      return false;
     }
-    return true;
   }
 }
 
