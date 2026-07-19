@@ -33,6 +33,69 @@ export async function geminiText(opts: { system?: string; messages: LlmMessage[]
   return callGemini(body);
 }
 
+/**
+ * Streaming chat completion (SSE). Yields text deltas as the model produces
+ * them so latency-sensitive callers — the live voice agent above all — can start
+ * speaking the first sentence while the rest is still being generated, instead
+ * of waiting for the whole reply.
+ */
+export async function* geminiTextStream(opts: {
+  system?: string;
+  messages: LlmMessage[];
+  maxTokens?: number;
+}): AsyncGenerator<string> {
+  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not set');
+  const contents = opts.messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+  const body: any = {
+    contents,
+    generationConfig: {
+      maxOutputTokens: opts.maxTokens ?? 800,
+      // No "thinking" pause before the first token — critical on a phone call.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  };
+  if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
+
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:streamGenerateContent` +
+    `?alt=sse&key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Gemini stream ${res.status}: ${await res.text()}`);
+  if (!res.body) throw new Error('Gemini stream: empty body');
+
+  const decoder = new TextDecoder();
+  let buf = '';
+  // Node's fetch body is an async-iterable web stream.
+  for await (const bytes of res.body as unknown as AsyncIterable<Uint8Array>) {
+    buf += decoder.decode(bytes, { stream: true });
+    // SSE frames are separated by a blank line; each line we care about is "data: {...}".
+    let nl: number;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try {
+        const json = JSON.parse(payload) as any;
+        const text = (json?.candidates?.[0]?.content?.parts ?? [])
+          .map((p: any) => p?.text ?? '')
+          .join('');
+        if (text) yield text;
+      } catch {
+        // Partial/keep-alive frame — ignore and wait for more bytes.
+      }
+    }
+  }
+}
+
 // Vision: one image + a text prompt.
 export async function geminiVision(opts: { base64: string; mimeType: string; prompt: string; maxTokens?: number }): Promise<string> {
   const body = {

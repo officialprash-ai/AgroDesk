@@ -7,7 +7,7 @@
  * multiagent layer instead of a single Gemini call.
  */
 
-import { geminiText, type LlmMessage } from '../../lib/llm.js';
+import { geminiText, geminiTextStream, type LlmMessage } from '../../lib/llm.js';
 
 export interface Responder {
   /** Reply for a finalized user utterance (streamed as chunks). */
@@ -64,7 +64,9 @@ export class GeminiVoiceResponder implements Responder {
 
   constructor(
     private readonly system: string = defaultVoiceSystemPrompt(),
-    private readonly maxTokens = 300,
+    // Phone replies are 1-2 spoken sentences. A tight cap keeps turns snappy and
+    // stops the model from drifting into a monologue the caller has to sit through.
+    private readonly maxTokens = 160,
   ) {}
 
   /** Seed the opener the agent already spoke so replies continue coherently. */
@@ -75,14 +77,34 @@ export class GeminiVoiceResponder implements Responder {
 
   async *respond(userText: string): AsyncIterable<string> {
     this.history.push({ role: 'user', content: userText });
-    // geminiText is non-streaming; voice replies are short so we yield once.
-    // For lower latency, add a streamGenerateContent helper to lib/llm.ts later.
-    const reply = await geminiText({
-      system: this.system,
-      messages: this.history,
-      maxTokens: this.maxTokens,
-    });
-    this.history.push({ role: 'assistant', content: reply });
-    if (reply) yield reply;
+    // Stream deltas so the engine can hand the FIRST sentence to TTS while the
+    // rest is still generating. Yielding the whole reply at once (the old
+    // behaviour) added the full generation time to every turn — dead air on a
+    // live call.
+    let full = '';
+    try {
+      for await (const delta of geminiTextStream({
+        system: this.system,
+        messages: this.history,
+        maxTokens: this.maxTokens,
+      })) {
+        full += delta;
+        yield delta;
+      }
+    } catch (err) {
+      // Streaming endpoint unavailable → fall back to the blocking call so the
+      // caller still gets an answer, just less promptly.
+      if (!full) {
+        full = await geminiText({
+          system: this.system,
+          messages: this.history,
+          maxTokens: this.maxTokens,
+        });
+        if (full) yield full;
+      } else {
+        throw err;
+      }
+    }
+    if (full) this.history.push({ role: 'assistant', content: full });
   }
 }

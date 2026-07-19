@@ -193,10 +193,14 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
     this.speaking = true;
     this.log.info('[voice-engine] user:', text);
 
+    const t0 = Date.now();
+    let firstTokenAt = 0;
+    let spokeAt = 0;
     try {
       let buffer = '';
       for await (const delta of this.responder.respond(text)) {
         if (myTurn !== this.turnToken) return;
+        if (!firstTokenAt) firstTokenAt = Date.now();
         buffer += delta;
         let match: RegExpMatchArray | null;
         while ((match = buffer.match(SENTENCE_END))) {
@@ -204,6 +208,13 @@ export class AgroDeskVoiceEngine implements VoiceEngine {
           const sentence = buffer.slice(0, idx).trim();
           buffer = buffer.slice(idx);
           if (sentence && !(await this.speak(sentence, myTurn))) return;
+          if (!spokeAt) {
+            spokeAt = Date.now();
+            this.log.info(
+              `[voice-engine] latency: llm_first_token=${firstTokenAt - t0}ms ` +
+                `first_audio=${spokeAt - t0}ms`,
+            );
+          }
         }
       }
       if (buffer.trim() && myTurn === this.turnToken) await this.speak(buffer.trim(), myTurn);
