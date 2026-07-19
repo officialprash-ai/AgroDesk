@@ -84,24 +84,30 @@ app.use(helmet({
 //
 // FRONTEND_URL must be set in production or no browser origin is allowed.
 const isProd = process.env.NODE_ENV === 'production';
+/** Normalise so a trailing slash / stray whitespace / casing can't silently break CORS. */
+const normalizeOrigin = (o: string) => o.trim().replace(/\/+$/, '').toLowerCase();
+/** Both FRONTEND_URL and EXTRA_CORS_ORIGINS accept a comma-separated list. */
+const splitOrigins = (v?: string) =>
+  v ? v.split(',').map(normalizeOrigin).filter(Boolean) : [];
+
 const ALLOWED_ORIGINS = [
   ...(isProd ? [] : ['http://localhost:5173', 'http://localhost:3000']),
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
-  ...(process.env.EXTRA_CORS_ORIGINS
-    ? process.env.EXTRA_CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
-    : []),
+  ...splitOrigins(process.env.FRONTEND_URL),
+  ...splitOrigins(process.env.EXTRA_CORS_ORIGINS),
 ];
 
 if (isProd && !process.env.FRONTEND_URL) {
   console.warn('[cors] WARNING: NODE_ENV=production but FRONTEND_URL is unset — all browser origins will be rejected.');
 }
+// Log the effective allowlist so a misconfigured origin is obvious at a glance.
+console.log('[cors] allowed origins:', ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS.join(', ') : '(none)');
 
 app.use(cors({
   origin: (origin, cb) => {
     // No Origin header = non-browser client (webhooks, health checks, curl).
     // Not a CSRF vector, since CSRF requires a browser-attached origin.
     if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(normalizeOrigin(origin))) return cb(null, true);
     return cb(new Error(`CORS: ${origin} not allowed`));
   },
   credentials: true,
