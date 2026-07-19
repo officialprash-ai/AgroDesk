@@ -32,11 +32,18 @@ export function putCallParams(params: CallParams): string {
   return token;
 }
 
-/** Retrieve and remove params for a token (one-shot). */
+/**
+ * Retrieve params for a token.
+ *
+ * NOT one-shot. Plivo can drop and re-establish the media WebSocket mid-call
+ * (a brief "glitch"), which builds a fresh engine for the same call. When this
+ * consumed the token, that second engine found nothing and fell back to the
+ * generic default greeting — so the caller heard the real script, a glitch,
+ * then a completely different second greeting. Entries still expire via TTL.
+ */
 export function takeCallParams(token: string | undefined): CallParams {
   if (!token) return {};
   const entry = store.get(token);
   if (!entry) return {};
-  store.delete(token);
   return entry.params;
 }
