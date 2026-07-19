@@ -118,7 +118,9 @@ export class SarvamTtsStream {
             speech_sample_rate: 8000,
             min_buffer_size: this.minBufferSize,
             max_chunk_length: 200,
-            enable_preprocessing: true,
+            // NOTE: only the documented streaming config fields belong here.
+            // `enable_preprocessing` is REST-only and made the socket reject the
+            // whole message with "Input parameters has to be a valid dictionary".
           },
         }),
       );
