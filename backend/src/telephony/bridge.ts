@@ -180,6 +180,11 @@ export function attachTelephonyBridge(server: Server, deps: BridgeDeps = {}): We
     });
   });
 
-  log.info(`[telephony] media WS mounted at ${deps.path ?? '/telephony/stream'} (provider=${provider.name})`);
+  // The provider is resolved per connection, so report the currently configured
+  // one rather than a mount-time singleton.
+  log.info(
+    `[telephony] media WS mounted at ${deps.path ?? '/telephony/stream'} ` +
+      `(provider=${getProvidersSync().voice ?? TELEPHONY_PROVIDER})`,
+  );
   return wss;
 }
